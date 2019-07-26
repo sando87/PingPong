@@ -63,6 +63,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\CubePlayer.cs" />
+    <Compile Include="Assets\Scripts\Defs.cs" />
     <Compile Include="Assets\Scripts\TabPoints.cs" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>C:/Users/sjlee/Downloads/unity/PingPong/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
