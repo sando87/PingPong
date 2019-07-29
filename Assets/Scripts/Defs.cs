@@ -4,11 +4,21 @@ using UnityEngine;
 
 namespace PP
 {
+    public enum CubeState { None, Ready, Jump, Fail, Success };
     public enum TabType { None, Main, PreHalf, Half, PostHalf };
-    struct TabInfo
+    public struct TabInfo
     {
+        public int idxStep;
         public float time;
         public TabType type;
-        public TabInfo(float _time, TabType _type) { time = _time; type = _type; }
+        public TabInfo(float _time, TabType _type, int _idxStep)
+        { time = _time; type = _type; idxStep = _idxStep; }
+    }
+    public struct Bar
+    {
+        public bool Main;
+        public bool Half;
+        public bool PreHalf;
+        public bool PostHalf;
     }
 }
