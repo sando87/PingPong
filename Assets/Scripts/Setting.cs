@@ -82,7 +82,7 @@ public class Setting : MonoBehaviour
     public float CalcBaseT(double height, double t, double y, bool whichOne)
     {
         if (Math.Abs(y) < 0.0001)
-            Debug.Log(y + "[[[zxcv");
+            return (float)t * 0.5f;
 
         double s = t;
         double y1 = height;
