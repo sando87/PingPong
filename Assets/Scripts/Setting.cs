@@ -13,6 +13,7 @@ public class Setting : MonoBehaviour
     public float OffTabTiming = 0;
     public float OffMusciStart = 0.25f;
     public float RatePassFail = 0.125f; //0, 0.0625f, 0.125f, 0.25f, 0.5f, 1.0f
+    public float RateAccuracy = 0.03125f;
 
     // y = a(t - t1)^2 + y1;
     private float CurveT1 = 0;
@@ -22,12 +23,14 @@ public class Setting : MonoBehaviour
     // x = at;
     private float LinearA = 0;
 
-    public bool JumpStarted = false;
+    public bool UserStarted = false;
 
     public float JumpHeightHalf = 0;
+    private float TimeFromStart = -1f;
+    private int IndexNextTP = 0;
 
     public GameObject PrefabTapPoint;
-    public List<TabPoint> tabPoints = new List<TabPoint>();
+    private List<TabInfo> tabPoints = new List<TabInfo>();
     private Bar[] BarArray = null;
 
     CubePlayer Player;
@@ -45,14 +48,24 @@ public class Setting : MonoBehaviour
         InitTapPoints();
     }
 
+    private void Update()
+    {
+        if(UserStarted)
+        {
+            TimeFromStart += Time.deltaTime;
+            InstantiateTapPoint();
+        }
+    }
+
     public void OnBtnStart()
     {
         Invoke("StartJump", OffMusciStart);
         audioSource.Play();
+        TimeFromStart = -OffMusciStart;
+        UserStarted = true;
     }
     private void StartJump()
     {
-        JumpStarted = true;
         Player.StartJump();
     }
 
@@ -123,32 +136,46 @@ public class Setting : MonoBehaviour
             BarArray[i].PreHalf = UnityEngine.Random.Range(0, 8) == 1 ? true : false;
         }
 
-        CreateTapPoints(BarArray);
+        CreateTapPointScripts(BarArray);
     }
-    private void CreateTapPoints(Bar[] barArray)
+    private void CreateTapPointScripts(Bar[] barArray)
     {
-        float acctime = 0;
+        float accTime = 0;
         TabInfo[] times = ToDeltas(barArray);
         Vector2 current = new Vector2(0, 0);
         float dir = 1.0f;
         for (int i = 0; i < times.Length; ++i)
         {
-            acctime += times[i].time;
+            accTime += times[i].time;
             float t = times[i].time + OffTabTiming;
             current.x += (dir * SpeedMoveX * t);
             current.y += GetCurveY(t);
             dir *= -1;
 
-            GameObject tab = Instantiate(PrefabTapPoint, current, Quaternion.identity);
-            TabPoint script = tab.GetComponent<TabPoint>();
-            script.idxTabArray = i;
-            script.idxStep = times[i].idxStep;
-            script.idxStepToNext = i < times.Length-1 ? times[i + 1].idxStep - times[i].idxStep : 4; //한마디에 4개의 step을 의미(한박,반박,반의반x2)
-            script.type = times[i].type;
-            script.lifetime = acctime;
-            script.Setting = this;
-            tabPoints.Add(script);
+            times[i].idxStepToNext = i < times.Length - 1 ? times[i + 1].idxStep - times[i].idxStep : -1; //한마디에 4개의 step을 의미(한박,반박,반의반x2)
+            times[i].worldPos = current;
+            times[i].time = accTime;
+            tabPoints.Add(times[i]);
         }
+    }
+    private bool InstantiateTapPoint()
+    {
+        if (IndexNextTP >= tabPoints.Count)
+            return false;
+
+        TabInfo info = tabPoints[IndexNextTP];
+        if (TimeFromStart >= tabPoints[IndexNextTP].time - TabPoint.Delay)
+        {
+            Vector3 pos = info.worldPos;
+            GameObject tab = Instantiate(PrefabTapPoint, pos, Quaternion.identity);
+            TabPoint tp = tab.GetComponent<TabPoint>();
+            info.script = tp;
+            tp.TapInfo = info;
+            tabPoints[IndexNextTP] = info;
+            IndexNextTP++;
+            return true;
+        }
+        return false;
     }
     TabInfo[] ToDeltas(Bar[] bars)
     {
@@ -176,7 +203,7 @@ public class Setting : MonoBehaviour
         }
         return times.ToArray();
     }
-    public TabPoint GetTapInfo(int index)
+    public TabInfo GetTapInfo(int index)
     {
         return tabPoints[index];
     }

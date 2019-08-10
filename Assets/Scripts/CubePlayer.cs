@@ -51,8 +51,7 @@ public class CubePlayer : MonoBehaviour
 
             UpdateCubeGraph();
 
-            TabPoint tp = Setting.GetTapInfo(TabIndex);
-            Destroy(tp.gameObject);
+            TouchTabPoint();
 
             ps.transform.position = transform.position;
             ps.Play();
@@ -81,9 +80,9 @@ public class CubePlayer : MonoBehaviour
 
     void UpdateCubeGraph()
     {
-        TabPoint tp = Setting.GetTapInfo(TabIndex);
-        TabPoint tpNext = Setting.GetTapInfo(TabIndex + 1);
-        float xx = tp.transform.position.x - transform.position.x;
+        TabInfo tp = Setting.GetTapInfo(TabIndex);
+        TabInfo tpNext = Setting.GetTapInfo(TabIndex + 1);
+        float xx = tp.worldPos.x - transform.position.x;
         float yetTime = Setting.GetLinearT(xx); //나가는 방향으로 안쪽에 있으면 +
 
         float nextTime = tp.idxStepToNext * Setting.TimePerBar * 0.25f;
@@ -92,7 +91,7 @@ public class CubePlayer : MonoBehaviour
         Setting.UpdateLinear(dist, time); //X축 방향 그래프 기울기 조정
 
 
-        float offsetY = transform.position.y - tp.transform.position.y;
+        float offsetY = transform.position.y - tp.worldPos.y;
         float baseT = 0;
         if (tp.idxStepToNext == 4)
         {
@@ -123,7 +122,7 @@ public class CubePlayer : MonoBehaviour
         {
             float fixedH = Setting.JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
-            float fixedY = tpNext.transform.position.y - tp.transform.position.y - offsetY;
+            float fixedY = tpNext.worldPos.y - tp.worldPos.y - offsetY;
             baseT = Setting.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
 
@@ -132,7 +131,7 @@ public class CubePlayer : MonoBehaviour
     }
     bool CheckPassFail()
     {
-        TabPoint tp = Setting.GetTapInfo(TabIndex);
+        TabPoint tp = Setting.GetTapInfo(TabIndex).script;
         float x = tp.transform.position.x - transform.position.x;
         float time = Setting.GetLinearT(x);
         float tolerance = Setting.TimePerBar * Setting.RatePassFail;
@@ -163,6 +162,18 @@ public class CubePlayer : MonoBehaviour
         pos.y = TabPositionY + Setting.GetCurveY(TabResetTime);
         transform.position = pos;
         transform.Rotate(new Vector3(0, 0, -1), DirRight * Setting.SpeedRotate * Time.deltaTime);
+    }
+    void TouchTabPoint()
+    {
+        TabPoint tp = Setting.GetTapInfo(TabIndex).script;
+        float x = tp.transform.position.x - transform.position.x;
+        float time = Setting.GetLinearT(x);
+        float tolerance = Setting.TimePerBar * Setting.RateAccuracy;
+        if (Mathf.Abs(time) < tolerance)
+        {
+            tp.CleanHit();
+        }
+
     }
 
 }

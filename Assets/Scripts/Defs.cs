@@ -11,8 +11,11 @@ namespace PP
         public int idxStep;
         public float time;
         public TabType type;
+        public Vector2 worldPos;
+        public int idxStepToNext;
+        public TabPoint script;
         public TabInfo(float _time, TabType _type, int _idxStep)
-        { time = _time; type = _type; idxStep = _idxStep; }
+        { time = _time; type = _type; idxStep = _idxStep; idxStepToNext = -1; worldPos = new Vector2(); script = null; }
     }
     public struct Bar
     {
