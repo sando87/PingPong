@@ -5,9 +5,8 @@ using UnityEngine;
 public class CubePlayer : MonoBehaviour
 {
     ParticleSystem ps;
-    AudioSource audioSource;
     Camera cam;
-    Setting Setting;
+    SystemManager SysMgr;
 
     CubeState State;
 
@@ -18,9 +17,8 @@ public class CubePlayer : MonoBehaviour
 
     void Start()
     {
-        Setting = GameObject.Find("SystemObject").GetComponent<Setting>();
+        SysMgr = GameObject.Find("SystemObject").GetComponent<SystemManager>();
         ps = GameObject.Find("Particle System").GetComponent<ParticleSystem>();
-        audioSource = GameObject.Find("AudioPlayer").GetComponent<AudioSource>();
         cam = GameObject.Find("Main Camera").GetComponent<Camera>();
 
         State = CubeState.Ready;
@@ -38,6 +36,18 @@ public class CubePlayer : MonoBehaviour
         }
     }
 
+    public void ResetCube()
+    {
+        State = CubeState.Ready;
+        transform.position = new Vector3(0, 0, 0);
+        transform.rotation = Quaternion.identity;
+        MoveCamera();
+        TabResetTime = 0;
+        TabPositionY = 0;
+        DirRight = 1;
+        TabIndex = 0;
+        gameObject.SetActive(true);
+    }
     public void StartJump()
     {
         State = CubeState.Jump;
@@ -67,28 +77,28 @@ public class CubePlayer : MonoBehaviour
     }
     void DoFail()
     {
-        audioSource.Stop();
-        Destroy(gameObject);
-        Debug.Log("Fail!!");
+        State = CubeState.Ready;
+        SysMgr.StopJump();
+        gameObject.SetActive(false);
     }
     void DoSuccess()
     {
-        audioSource.Stop();
-        Destroy(gameObject);
-        Debug.Log("Success!!");
+        State = CubeState.Ready;
+        SysMgr.StopJump();
+        gameObject.SetActive(false);
     }
 
     void UpdateCubeGraph()
     {
-        TabInfo tp = Setting.GetTapInfo(TabIndex);
-        TabInfo tpNext = Setting.GetTapInfo(TabIndex + 1);
+        TabInfo tp = SysMgr.GetTapInfo(TabIndex);
+        TabInfo tpNext = SysMgr.GetTapInfo(TabIndex + 1);
         float xx = tp.worldPos.x - transform.position.x;
-        float yetTime = Setting.GetLinearT(xx); //나가는 방향으로 안쪽에 있으면 +
+        float yetTime = Curve.GetLinearT(xx); //나가는 방향으로 안쪽에 있으면 +
 
         float nextTime = tp.idxStepToNext * Setting.TimePerBar * 0.25f;
         float time = nextTime + yetTime;
         float dist = xx - nextTime * Setting.SpeedMoveX * DirRight;
-        Setting.UpdateLinear(dist, time); //X축 방향 그래프 기울기 조정
+        Curve.UpdateLinear(dist, time); //X축 방향 그래프 기울기 조정
 
 
         float offsetY = transform.position.y - tp.worldPos.y;
@@ -98,14 +108,14 @@ public class CubePlayer : MonoBehaviour
             float fixedH = Setting.JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = -offsetY;
-            baseT = Setting.CalcBaseT(fixedH, fixedT, fixedY, false);
+            baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
         else if (tp.idxStepToNext == 3)
         {
             float fixedH = Setting.JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = Setting.JumpHeightHalf - offsetY;
-            baseT = Setting.CalcBaseT(fixedH, fixedT, fixedY, false);
+            baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
         else if (tp.idxStepToNext == 2)
         {
@@ -116,24 +126,24 @@ public class CubePlayer : MonoBehaviour
             float fixedH = Setting.JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = Setting.JumpHeightHalf - offsetY;
-            baseT = Setting.CalcBaseT(fixedH, fixedT, fixedY, true);
+            baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, true);
         }
         else
         {
             float fixedH = Setting.JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = tpNext.worldPos.y - tp.worldPos.y - offsetY;
-            baseT = Setting.CalcBaseT(fixedH, fixedT, fixedY, false);
+            baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
 
         float baseY = Setting.JumpHeight - offsetY;
-        Setting.UpdateCurve(new Vector2(baseT, baseY), new Vector2(0, 0)); //Y축 방향 곡선 그래프 계수 조정
+        Curve.UpdateCurve(new Vector2(baseT, baseY), new Vector2(0, 0)); //Y축 방향 곡선 그래프 계수 조정
     }
     bool CheckPassFail()
     {
-        TabPoint tp = Setting.GetTapInfo(TabIndex).script;
+        TabPoint tp = SysMgr.GetTapInfo(TabIndex).script;
         float x = tp.transform.position.x - transform.position.x;
-        float time = Setting.GetLinearT(x);
+        float time = Curve.GetLinearT(x);
         float tolerance = Setting.TimePerBar * Setting.RatePassFail;
         if (Mathf.Abs(time) > tolerance)
         {
@@ -157,17 +167,17 @@ public class CubePlayer : MonoBehaviour
     void MoveCube()
     {
         Vector3 pos = transform.position;
-        pos.x += Setting.GetLinearX(Time.deltaTime);
+        pos.x += Curve.GetLinearX(Time.deltaTime);
         TabResetTime += Time.deltaTime;
-        pos.y = TabPositionY + Setting.GetCurveY(TabResetTime);
+        pos.y = TabPositionY + Curve.GetCurveY(TabResetTime);
         transform.position = pos;
         transform.Rotate(new Vector3(0, 0, -1), DirRight * Setting.SpeedRotate * Time.deltaTime);
     }
     void TouchTabPoint()
     {
-        TabPoint tp = Setting.GetTapInfo(TabIndex).script;
+        TabPoint tp = SysMgr.GetTapInfo(TabIndex).script;
         float x = tp.transform.position.x - transform.position.x;
-        float time = Setting.GetLinearT(x);
+        float time = Curve.GetLinearT(x);
         float tolerance = Setting.TimePerBar * Setting.RateAccuracy;
         if (Mathf.Abs(time) < tolerance)
         {
@@ -175,5 +185,4 @@ public class CubePlayer : MonoBehaviour
         }
 
     }
-
 }
