@@ -32,6 +32,7 @@ public class SystemManager : MonoBehaviour
     void Start()
     {
         LoadSongList();
+        //CreateMusicTest();
     }
 
     // Update is called once per frame
@@ -54,17 +55,14 @@ public class SystemManager : MonoBehaviour
     //PathInfo.MetaInfos 경로에 있는 곡 정보들을 로딩해서 첫화면(음악 리스트)을 구성한다.
     void LoadSongList()
     {
-        DirectoryInfo di = new DirectoryInfo(PathInfo.BasicSongs);
-        foreach (FileInfo FileInfo in di.GetFiles())
+        TextAsset[] assets = Resources.LoadAll<TextAsset>("MetaInfo/Basic");
+
+        foreach (TextAsset asset in assets)
         {
-            if (FileInfo.Extension.ToLower().CompareTo(".bin") == 0)
-            {
-                byte[] buf = File.ReadAllBytes(PathInfo.BasicSongs + FileInfo.Name);
-                Song song = Utils.Deserialize<Song>(buf);
-                GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, pnContents.transform);
-                ItemDisplay item = obj.GetComponent<ItemDisplay>();
-                item.SongInfo = song;
-            }
+            Song song = Utils.Deserialize<Song>(asset.bytes);
+            GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, pnContents.transform);
+            ItemDisplay item = obj.GetComponent<ItemDisplay>();
+            item.SongInfo = song;
         }
     }
     public void SelectSong(Song song)
@@ -73,8 +71,7 @@ public class SystemManager : MonoBehaviour
         UpdateCurve();
         CreateTapPointScripts();
 
-        string AudioName = CurrentSong.SongFileName.Substring(0, CurrentSong.SongFileName.Length - 4);
-        audioSource.clip = Resources.Load<AudioClip>(PathInfo.AudioClip + AudioName);
+        audioSource.clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.SongFileName);
 
         State = SystemState.Standby;
         pnRootUI.SetActive(false);
@@ -83,9 +80,13 @@ public class SystemManager : MonoBehaviour
     private void PlaySong()
     {
         State = SystemState.WaitJump;
-        Invoke("StartJump", CurrentSong.JumpDelay);
+        float delay = CurrentSong.JumpDelay + Setting.MusicDelay;
+        if (delay < 0)
+            delay = 0;
+
+        Invoke("StartJump", delay);
         audioSource.Play();
-        accTime = -CurrentSong.JumpDelay;
+        accTime = -delay;
         IndexNextTP = 0;
     }
     private void StartJump()
@@ -177,5 +178,31 @@ public class SystemManager : MonoBehaviour
     public TabInfo GetTapInfo(int index)
     {
         return tabPoints[index];
+    }
+
+
+    public void CreateMusicTest()
+    {
+        Song song = new Song();
+        song.BPM = 162; //128, 148, 162
+        song.JumpDelay = 0.5f; //0.43f, 0.43f, 0.5f
+        song.Beat = BeatType.B4B4;
+        song.SongFileName = "YouAndI"; //GoAway, Hurt, YouAndI
+        song.TitleImageName = "2ne1_chart1";
+        song.SongName = "YouAndI";
+        song.SingerName = "2NE1";
+        song.Grade = 0;
+
+        song.Bars = new Bar[256];
+        for (int i = 0; i < song.Bars.Length; ++i)
+        {
+            song.Bars[i].Main = true;
+            song.Bars[i].Half = UnityEngine.Random.Range(0, 5) == 1 ? true : false;
+            song.Bars[i].PostHalf = UnityEngine.Random.Range(0, 8) == 1 ? true : false;
+            song.Bars[i].PreHalf = UnityEngine.Random.Range(0, 8) == 1 ? true : false;
+        }
+
+        byte[] buf = Utils.Serialize(song);
+        File.WriteAllBytes(PathInfo.BasicSongs + song.SongName + ".bytes", buf);
     }
 }

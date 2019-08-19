@@ -17,8 +17,7 @@ public class ItemDisplay : MonoBehaviour
         FindChildUI();
 
         Song info = SongInfo;
-        string nameWithoutExt = info.TitleImageName.Substring(0, info.TitleImageName.Length - 4);
-        TitleImage.sprite = Resources.Load<Sprite>(PP.PathInfo.Images + nameWithoutExt);
+        TitleImage.sprite = Resources.Load<Sprite>(PP.PathInfo.Images + info.TitleImageName);
         GradeImage.sprite = Resources.Load<Sprite>(PP.PathInfo.Images + "star");
         TitleName.text = info.SongName;
         SingerName.text = info.SingerName;
