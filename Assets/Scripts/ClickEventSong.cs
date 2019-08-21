@@ -24,7 +24,7 @@ public class ClickEventSong : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonUp(0))
+        if (Input.GetMouseButton(0))
         {
             ped.position = Input.mousePosition;
             var results = new List<RaycastResult>();
@@ -38,7 +38,6 @@ public class ClickEventSong : MonoBehaviour
                     break;
                 }
             }
-
         }
     }
 

@@ -64,16 +64,20 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\BackCube.cs" />
     <Compile Include="Assets\Scripts\Background.cs" />
+    <Compile Include="Assets\Scripts\ChartArea.cs" />
     <Compile Include="Assets\Scripts\ClickEventSong.cs" />
     <Compile Include="Assets\Scripts\CubePlayer.cs" />
     <Compile Include="Assets\Scripts\Curve.cs" />
     <Compile Include="Assets\Scripts\Defs.cs" />
     <Compile Include="Assets\Scripts\ItemDisplay.cs" />
+    <Compile Include="Assets\Scripts\MainCategory.cs" />
     <Compile Include="Assets\Scripts\MyHorizontalLayoutGroup.cs" />
     <Compile Include="Assets\Scripts\Setting.cs" />
     <Compile Include="Assets\Scripts\Song.cs" />
     <Compile Include="Assets\Scripts\SystemManager.cs" />
     <Compile Include="Assets\Scripts\TabPoint.cs" />
+    <Compile Include="Assets\Scripts\Touch2DEvent.cs" />
+    <Compile Include="Assets\Scripts\UserTap.cs" />
     <Compile Include="Assets\Scripts\Utils.cs" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>C:/Users/sjlee/Downloads/unity/PingPong/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
