@@ -12,7 +12,7 @@ public class ChartArea : MonoBehaviour
     private GameObject mMarker = null;
     private List<GameObject> lines = new List<GameObject>();
 
-    private float accTime = 0;
+    private float markerPosTime = 0;
     private float sampleDT = 0.01f;
     private float sampleTime = 180f;
     private int pixelPerSample = 2;
@@ -31,15 +31,11 @@ public class ChartArea : MonoBehaviour
         int width = (int)(pixelPerSample * sampleTime / sampleDT) / Screen.width + 1;
         Vector2 max = GetComponent<RectTransform>().anchorMax;
         GetComponent<RectTransform>().anchorMax = new Vector2(width, max.y);
+        CreateMarker(0);
     }
     private void Update()
     {
-        if(mMarker != null)
-        {
-            accTime += Time.deltaTime;
-            int cnt = (int)(accTime / sampleDT);
-            mMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(cnt * pixelPerSample, 0);
-        }
+        UpdateMarkerPosition();
     }
     private float[] Sample(float[] origin, float dt)
     {
@@ -130,8 +126,34 @@ public class ChartArea : MonoBehaviour
     }
     public void Play()
     {
-        CreateMarker(0);
-        GetComponent<AudioSource>().Play();
+        markerPosTime = 0;
+        GetComponent<AudioSource>().time = 50;
+        //GetComponent<AudioSource>().Play();
+    }
+    void UpdateMarkerPosition()
+    {
+        if (mMarker != null)
+        {
+            markerPosTime += Time.deltaTime;
+            int cnt = (int)(markerPosTime / sampleDT);
+            mMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(cnt * pixelPerSample, 0);
+            if(mMarker.transform.position.x >= Screen.width)
+            {
+                Vector3 pos = transform.position;
+                pos.x -= Screen.width;
+                transform.position = pos;
+            }
+        }
+    }
+
+    public void OnClickChart(Vector2 point)
+    {
+        float secPerPixel = sampleDT / pixelPerSample;
+        Vector2 pos = transform.position;
+        Vector2 relPos = point - pos;
+        float currentTime = relPos.x * secPerPixel;
+        markerPosTime = currentTime;
+        GetComponent<AudioSource>().time = currentTime;
     }
     public void OnDragChart(Vector2 delta)
     {
