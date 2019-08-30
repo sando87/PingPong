@@ -19,7 +19,7 @@ public class Touch2DEvent : MonoBehaviour
     private Vector3 mMouseDownPt;
     private bool mIsMouseDown;
     private bool mIsMouseDrag;
-    private const int mRangeClickTol = 1; //pixel unit
+    private const int mRangeClickTol = 3; //pixel unit
 
     private Canvas canvas;
     private PointerEventData ped;

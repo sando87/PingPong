@@ -11,7 +11,7 @@ namespace PP
     public enum TabType { None, Main, PreHalf, Half, PostHalf };
     public class PathInfo
     {
-        public static string BasicSongs = Application.dataPath + "\\Musics\\Basic\\";
+        public static string BasicSongs = Application.dataPath + "\\Resources\\MetaInfo\\Basic\\";
         public static string AudioClip = "AudioClips\\";
         public static string Images = "Images\\";
     }

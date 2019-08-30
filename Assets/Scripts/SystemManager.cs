@@ -187,6 +187,7 @@ public class SystemManager : MonoBehaviour
         song.BPM = 162; //128, 148, 162
         song.JumpDelay = 0.5f; //0.43f, 0.43f, 0.5f
         song.Beat = BeatType.B4B4;
+        song.FullName = "";
         song.SongFileName = "YouAndI"; //GoAway, Hurt, YouAndI
         song.TitleImageName = "2ne1_chart1";
         song.SongName = "YouAndI";
