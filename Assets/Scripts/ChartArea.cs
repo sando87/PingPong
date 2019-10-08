@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Android;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 
@@ -27,10 +28,12 @@ public class ChartArea : MonoBehaviour
     private float refHeight = 400f;
     private float currentOffTime = 0;
     private float threshold = 20.0f;
+    private float tapPointsHeight = 200.0f;
     private float[] originSoundData = null;
     private float[] sampledSoundData = null;
     private List<GameObject> TPs = new List<GameObject>();
     private bool isPlay = false;
+    private bool isAutoCamera = false;
 
     private float sampleTime = 0;
     private string mFileFullName = "";
@@ -122,18 +125,18 @@ public class ChartArea : MonoBehaviour
             Destroy(lines[i]);
         lines.Clear();
     }
-    void CreateTapPoints(float height)
+    void CreateTapPoints()
     {
         ClearTapPoints();
 
         float secPerPixel = sampleDT / pixelPerSample;
         float secTPs = (120f / mBPM) / 4f;
         int idx = 0;
-        for (float sec = mStartTime; sec < sampleTime; sec += secTPs)
+        for (float sec = mStartTime + secTPs * 4f; sec < sampleTime; sec += secTPs)
         {
             float pixel = sec / secPerPixel;
             float size = idx % 4 == 0 ? 50f : 25f;
-            GameObject obj = CreateTapPoint(new Vector2(pixel, height), size);
+            GameObject obj = CreateTapPoint(new Vector2(pixel, tapPointsHeight), size);
             TPs.Add(obj);
             idx++;
         }
@@ -144,6 +147,20 @@ public class ChartArea : MonoBehaviour
             Destroy(TPs[i]);
 
         TPs.Clear();
+    }
+    void UpdateTapPoints()
+    {
+        float secPerPixel = sampleDT / pixelPerSample;
+        float secTPs = (120f / mBPM) / 4f;
+        float time = mStartTime + secTPs * 4f;
+        for (int i = 0; i < TPs.Count; ++i)
+        {
+            float xPos = time / secPerPixel;
+            RectTransform rt = TPs[i].GetComponent<RectTransform>();
+            rt.anchoredPosition = new Vector2(xPos, tapPointsHeight);
+
+            time += secTPs;
+        }
     }
     GameObject CreateTapPoint(Vector2 anchoredPos, float size)
     {
@@ -174,16 +191,22 @@ public class ChartArea : MonoBehaviour
         {
             mMusicSrc.Pause();
             isPlay = false;
+            isAutoCamera = false;
         }
         else
         {
             mMusicSrc.time = markerPosTime;
             mMusicSrc.Play();
             isPlay = true;
+            isAutoCamera = true;
         }
     }
     public void Load()
     {
+#if PLATFORM_ANDROID
+        if (!Permission.HasUserAuthorizedPermission(Permission.ExternalStorageRead))
+            Permission.RequestUserPermission(Permission.ExternalStorageRead);
+#endif
         SimpleFileBrowser.FileBrowser.ShowLoadDialog(OnLoadSuccess, null);
     }
     public void OnLoadSuccess(string fullname)
@@ -225,24 +248,27 @@ public class ChartArea : MonoBehaviour
         Vector2 max = GetComponent<RectTransform>().anchorMax;
         GetComponent<RectTransform>().anchorMax = new Vector2(width, max.y);
 
-        CreateTapPoints(200.0f);
+        CreateTapPoints();
     }
     public void Finish()
     {
+        string[] splits = mFileFullName.Split(new char[2] { '\\', '/' });
+        string filename = splits[splits.Length - 1];
         Song song = new Song();
         song.BPM = mBPM; //128, 148, 162
         song.JumpDelay = mStartTime; //0.43f, 0.43f, 0.5f
         song.Beat = BeatType.B4B4;
+        song.Type = FileType.User;
         song.FullName = mFileFullName;
         song.SongFileName = ""; //GoAway, Hurt, YouAndI
         song.TitleImageName = "";
-        song.SongName = "lsjTest";
+        song.SongName = filename.Split('.')[0];
         song.SingerName = "";
         song.Grade = 0;
 
         song.Bars = ExportToBars();
         byte[] buf = Utils.Serialize(song);
-        File.WriteAllBytes(PathInfo.BasicSongs + song.SongName + ".bytes", buf);
+        File.WriteAllBytes(Application.persistentDataPath + "/" + song.SongName + ".bytes", buf);
     }
     void UpdateMarkerPosition()
     {
@@ -254,7 +280,7 @@ public class ChartArea : MonoBehaviour
 
             int cnt = (int)(markerPosTime / sampleDT);
             mMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(cnt * pixelPerSample, 0);
-            if(mMarker.transform.position.x >= Screen.width)
+            if(isAutoCamera && mMarker.transform.position.x >= Screen.width)
             {
                 Vector3 pos = transform.position;
                 pos.x -= Screen.width;
@@ -271,6 +297,23 @@ public class ChartArea : MonoBehaviour
         }
     }
 
+    public void OnEditEnd_BPM(string value)
+    {
+        if(value.Length > 0)
+        {
+            mBPM = int.Parse(value);
+            UpdateTapPoints();
+        }
+    }
+    public void OnEditEnd_Off(string value)
+    {
+        if (value.Length > 0)
+        {
+            mStartTime = float.Parse(value);
+            UpdateTapPoints();
+        }
+    }
+
     float MousePointToTime(Vector2 point)
     {
         float secPerPixel = sampleDT / pixelPerSample;
@@ -282,7 +325,7 @@ public class ChartArea : MonoBehaviour
     int TimeToTPIndex(float time)
     {
         float secTPs = (120f / mBPM) / 4f;
-        time -= mStartTime;
+        time -= (mStartTime + secTPs * 4f);
         if (time < 0)
             return -1;
 
@@ -321,12 +364,16 @@ public class ChartArea : MonoBehaviour
 
         markerPosTime = MousePointToTime(point);
         GetComponent<AudioSource>().time = markerPosTime;
+        isAutoCamera = false;
     }
     public void OnDragChart(Vector2 delta)
     {
-        Vector3 pos = transform.position;
-        pos.x += delta.x;
-        transform.position = pos;
+        //Vector3 pos = transform.position;
+        //pos.x += delta.x;
+        //if (pos.x > 0)
+        //    pos.x = 0;
+        //transform.position = pos;
+        isAutoCamera = false;
     }
     public void OnDragChartEnd(Vector2 point)
     {
@@ -369,7 +416,7 @@ public class ChartArea : MonoBehaviour
             TPs[i * 4 + 3].GetComponent<Image>().sprite = bars[i].PostHalf ? mActiveImage : mEmptyImage;
         }
     }
-    public void TestCreateRandomTPs()
+    public void OnBtnCreateRandomTPs()
     {
         Bar[] bars = new Bar[128];
         for (int i = 0; i < bars.Length; ++i)

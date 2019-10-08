@@ -19,7 +19,7 @@ public class Touch2DEvent : MonoBehaviour
     private Vector3 mMouseDownPt;
     private bool mIsMouseDown;
     private bool mIsMouseDrag;
-    private const int mRangeClickTol = 3; //pixel unit
+    private const int mRangeClickTol = 5; //pixel unit
 
     private Canvas canvas;
     private PointerEventData ped;
@@ -58,6 +58,7 @@ public class Touch2DEvent : MonoBehaviour
             if (mIsMouseDown && !mIsMouseDrag)
             {
                 Vector3 diff = mMouseDownPt - Input.mousePosition;
+                Debug.Log(diff.magnitude);
                 if (diff.magnitude > mRangeClickTol)
                 {
                     mMousePrePos = Input.mousePosition;

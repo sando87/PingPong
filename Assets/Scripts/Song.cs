@@ -10,6 +10,7 @@ public class Song
     public int BPM;
     public float JumpDelay;
     public BeatType Beat;
+    public FileType Type;
     public string FullName;
     public string SongFileName;
     public string TitleImageName;

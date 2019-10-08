@@ -142,6 +142,11 @@ public class CubePlayer : MonoBehaviour
     bool CheckPassFail()
     {
         TabPoint tp = SysMgr.GetTapInfo(TabIndex).script;
+        if(tp == null)
+        {
+            State = CubeState.Fail;
+            return true;
+        }
         float x = tp.transform.position.x - transform.position.x;
         float time = Curve.GetLinearT(x);
         float tolerance = Setting.TimePerBar * Setting.RatePassFail;

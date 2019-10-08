@@ -4,6 +4,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UIElements;
 using PP;
+using UnityEngine.Networking;
 
 /*
  * <SystemManager 클래스가 하는 일>
@@ -31,6 +32,7 @@ public class SystemManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        //InitNetwork();
         LoadSongList();
         //CreateMusicTest();
     }
@@ -52,6 +54,46 @@ public class SystemManager : MonoBehaviour
         }
     }
 
+    void InitNetwork()
+    {
+        NetworkClient inst = NetworkClient.Inst();
+        bool ret = inst.ConnectAndRecv("127.0.0.1", 9435);
+        if (ret)
+        {
+            ICD.CMD_FileUpload.OnRecv += OnRecv;
+
+            ICD.CMD_FileUpload msg = new ICD.CMD_FileUpload();
+
+            byte[] buf = File.ReadAllBytes("D:\\test.txt");
+            msg.stream = buf;
+
+            msg.musicInfo.id = 14;
+            msg.musicInfo.title = "ttt";
+            msg.musicInfo.artist = "aaa";
+            msg.musicInfo.userid = "kim";
+            msg.musicInfo.fn_meta = "test";
+            msg.musicInfo.fn_img = "test";
+            msg.musicInfo.fn_music = "test";
+
+            msg.fileInfo.streamSize = buf.Length;
+            msg.fileInfo.filename = "test";
+            msg.fileInfo.ext = "txt";
+            msg.fileInfo.type = ICD.ICDDefines.FILETYPE_META;
+
+            msg.FillHeader(ICD.ICDDefines.CMD_Upload);
+
+            inst.SendToServer(msg.Serialize());
+        }
+    }
+    public ICD.stHeader OnRecv(ICD.stHeader _msg, string _info)
+    {
+        if (_msg.GetType() != typeof(ICD.CMD_FileUpload))
+            return null;
+        ICD.CMD_FileUpload msg = (ICD.CMD_FileUpload)_msg;
+        Debug.Log(msg.fileInfo.filename);
+        return _msg;
+    }
+
     //PathInfo.MetaInfos 경로에 있는 곡 정보들을 로딩해서 첫화면(음악 리스트)을 구성한다.
     void LoadSongList()
     {
@@ -64,6 +106,22 @@ public class SystemManager : MonoBehaviour
             ItemDisplay item = obj.GetComponent<ItemDisplay>();
             item.SongInfo = song;
         }
+
+        string path = Application.persistentDataPath;
+        DirectoryInfo dir = new DirectoryInfo(path);
+
+        FileSystemInfo[] items = dir.GetFileSystemInfos();
+        for (int i = 0; i < items.Length; i++)
+        {
+            if (items[i].Extension != ".bytes")
+                continue;
+
+            byte[] bytes = File.ReadAllBytes(items[i].FullName);
+            Song song = Utils.Deserialize<Song>(bytes);
+            GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, pnContents.transform);
+            ItemDisplay item = obj.GetComponent<ItemDisplay>();
+            item.SongInfo = song;
+        }
     }
     public void SelectSong(Song song)
     {
@@ -71,11 +129,33 @@ public class SystemManager : MonoBehaviour
         UpdateCurve();
         CreateTapPointScripts();
 
-        audioSource.clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.SongFileName);
+        AudioClip clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.SongFileName);
+        if(clip != null)
+        {
+            audioSource.clip = clip;
+        }
+        else
+        {
+            audioSource.clip = LoadAudioClip(CurrentSong.FullName);
+        }
+        
 
         State = SystemState.Standby;
         pnRootUI.SetActive(false);
         Player.ResetCube();
+    }
+    public AudioClip LoadAudioClip(string filename)
+    {
+        string url = "file://" + filename;
+        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
+        {
+            www.SendWebRequest();
+            while (!www.isDone) { }
+            if (www.isNetworkError)
+                return null;
+
+            return DownloadHandlerAudioClip.GetContent(www);
+        }
     }
     private void PlaySong()
     {
