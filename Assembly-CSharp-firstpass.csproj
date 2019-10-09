@@ -71,6 +71,7 @@
     <Compile Include="Assets\Plugins\SimpleFileBrowser\Scripts\SimpleRecycledListView\ListItem.cs" />
     <Compile Include="Assets\Plugins\SimpleFileBrowser\Scripts\SimpleRecycledListView\RecycledListView.cs" />
     <None Include="Assets\Plugins\SimpleFileBrowser\README.txt" />
+    <None Include="Assets\Plugins\Android\AndroidManifest.xml" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>C:/Users/sjlee/Downloads/unity/PingPong/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
     </Reference>

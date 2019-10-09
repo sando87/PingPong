@@ -15,6 +15,8 @@ public class ChartArea : MonoBehaviour
     public AudioSource mMusicSrc;
     public Sprite mActiveImage;
     public Sprite mEmptyImage;
+    public Text mEditBPM;
+    public Text mEditOFF;
     public int mBPM;
     public float mStartTime;
     private RectTransform graphContainer;
@@ -132,7 +134,7 @@ public class ChartArea : MonoBehaviour
         float secPerPixel = sampleDT / pixelPerSample;
         float secTPs = (120f / mBPM) / 4f;
         int idx = 0;
-        for (float sec = mStartTime + secTPs * 4f; sec < sampleTime; sec += secTPs)
+        for (float sec = mStartTime; sec < sampleTime; sec += secTPs)
         {
             float pixel = sec / secPerPixel;
             float size = idx % 4 == 0 ? 50f : 25f;
@@ -150,17 +152,24 @@ public class ChartArea : MonoBehaviour
     }
     void UpdateTapPoints()
     {
-        float secPerPixel = sampleDT / pixelPerSample;
-        float secTPs = (120f / mBPM) / 4f;
-        float time = mStartTime + secTPs * 4f;
-        for (int i = 0; i < TPs.Count; ++i)
-        {
-            float xPos = time / secPerPixel;
-            RectTransform rt = TPs[i].GetComponent<RectTransform>();
-            rt.anchoredPosition = new Vector2(xPos, tapPointsHeight);
+        mEditBPM.GetComponent<Text>().text = mBPM.ToString();
+        mEditOFF.GetComponent<Text>().text = mStartTime.ToString();
 
-            time += secTPs;
-        }
+        Bar[] bars = ExportToBars();
+        CreateTapPoints();
+        ImportToBars(bars);
+
+        //float secPerPixel = sampleDT / pixelPerSample;
+        //float secTPs = (120f / mBPM) / 4f;
+        //float time = mStartTime + secTPs * 4f;
+        //for (int i = 0; i < TPs.Count; ++i)
+        //{
+        //    float xPos = time / secPerPixel;
+        //    RectTransform rt = TPs[i].GetComponent<RectTransform>();
+        //    rt.anchoredPosition = new Vector2(xPos, tapPointsHeight);
+        //
+        //    time += secTPs;
+        //}
     }
     GameObject CreateTapPoint(Vector2 anchoredPos, float size)
     {
@@ -185,6 +194,7 @@ public class ChartArea : MonoBehaviour
         ClearLines();
         ShowGraph(sampledSoundData, currentOffTime);
     }
+
     public void Play()
     {
         if (isPlay)
@@ -270,30 +280,29 @@ public class ChartArea : MonoBehaviour
         byte[] buf = Utils.Serialize(song);
         File.WriteAllBytes(Application.persistentDataPath + "/" + song.SongName + ".bytes", buf);
     }
-    void UpdateMarkerPosition()
+    public void OnBtnCreateRandomTPs()
     {
-        if (mMarker != null)
+        int barCount = TPs.Count / 4;
+        Bar[] bars = new Bar[barCount];
+        for (int i = 0; i < bars.Length; ++i)
         {
-            int preTpIdx = TimeToTPIndex(markerPosTime + tapSyncOffTime);
-            if(isPlay)
-                markerPosTime += Time.deltaTime;
+            bars[i].Main = true;
+            bars[i].Half = UnityEngine.Random.Range(0, 3) == 1 ? true : false;
+            bars[i].PostHalf = UnityEngine.Random.Range(0, 7) == 1 ? true : false;
+            bars[i].PreHalf = UnityEngine.Random.Range(0, 5) == 1 ? true : false;
+        }
 
-            int cnt = (int)(markerPosTime / sampleDT);
-            mMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(cnt * pixelPerSample, 0);
-            if(isAutoCamera && mMarker.transform.position.x >= Screen.width)
-            {
-                Vector3 pos = transform.position;
-                pos.x -= Screen.width;
-                transform.position = pos;
-            }
-            int postTpIdx = TimeToTPIndex(markerPosTime + tapSyncOffTime);
-            if(postTpIdx == preTpIdx + 1 && TPs[postTpIdx].tag == "1")
-            {
-                if (postTpIdx % 4 == 0)
-                    mKickSrc.Play();
-                else
-                    mTickSrc.Play();
-            }
+        ImportToBars(bars);
+    }
+    public void OnBtnDetectBPM()
+    {
+        BMPDector dt = new BMPDector();
+        int[] bpms = dt.DetectBPM(mMusicSrc.clip);
+        if(bpms!=null & bpms.Length > 0)
+        {
+            mBPM = bpms[0];
+            mStartTime = (float)dt.GetFirstBeat();
+            UpdateTapPoints();
         }
     }
 
@@ -314,6 +323,32 @@ public class ChartArea : MonoBehaviour
         }
     }
 
+    void UpdateMarkerPosition()
+    {
+        if (mMarker != null)
+        {
+            int preTpIdx = TimeToTPIndex(markerPosTime + tapSyncOffTime);
+            if (isPlay)
+                markerPosTime += Time.deltaTime;
+
+            int cnt = (int)(markerPosTime / sampleDT);
+            mMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(cnt * pixelPerSample, 0);
+            if (isAutoCamera && mMarker.transform.position.x >= Screen.width)
+            {
+                Vector3 pos = transform.position;
+                pos.x -= Screen.width;
+                transform.position = pos;
+            }
+            int postTpIdx = TimeToTPIndex(markerPosTime + tapSyncOffTime);
+            if (postTpIdx == preTpIdx + 1 && TPs[postTpIdx].tag == "1")
+            {
+                if (postTpIdx % 4 == 0)
+                    mKickSrc.Play();
+                else
+                    mTickSrc.Play();
+            }
+        }
+    }
     float MousePointToTime(Vector2 point)
     {
         float secPerPixel = sampleDT / pixelPerSample;
@@ -325,7 +360,7 @@ public class ChartArea : MonoBehaviour
     int TimeToTPIndex(float time)
     {
         float secTPs = (120f / mBPM) / 4f;
-        time -= (mStartTime + secTPs * 4f);
+        time -= (mStartTime);
         if (time < 0)
             return -1;
 
@@ -416,17 +451,5 @@ public class ChartArea : MonoBehaviour
             TPs[i * 4 + 3].GetComponent<Image>().sprite = bars[i].PostHalf ? mActiveImage : mEmptyImage;
         }
     }
-    public void OnBtnCreateRandomTPs()
-    {
-        Bar[] bars = new Bar[128];
-        for (int i = 0; i < bars.Length; ++i)
-        {
-            bars[i].Main = true;
-            bars[i].Half = UnityEngine.Random.Range(0, 3) == 1 ? true : false;
-            bars[i].PostHalf = UnityEngine.Random.Range(0, 7) == 1 ? true : false;
-            bars[i].PreHalf = UnityEngine.Random.Range(0, 5) == 1 ? true : false;
-        }
-
-        ImportToBars(bars);
-    }
+    
 }

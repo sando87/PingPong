@@ -23,11 +23,12 @@ public class BMPDector
 
     public AudioClip GetAudioClip() { return mClip; }
     public double GetFirstBeat() { return mStartTime; }
-    public int[] DetectBPM(string wavFileName)
+    public int[] DetectBPM(AudioClip clip)
     {
         Reset();
 
-        LoadAudioClip();
+        //LoadAudioClip();
+        mClip = clip;
 
         mDT = 1.0 / (mClip.frequency / mDivFactor);
         mSpectrumStep = 1.0 / ((mClip.frequency / (double)mDivFactor) / mFFTCount);
