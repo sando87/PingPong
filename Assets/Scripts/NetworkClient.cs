@@ -5,13 +5,25 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Events;
 
-public class NetworkClient
+public class NetworkClient : MonoBehaviour
 {
-    public static NetworkClient mInst = new NetworkClient();
-    TcpClient mClient = null;
-    bool isRunThread = false;
+    [Serializable]
+    public class NetworkEvent : UnityEvent<ICD.stHeader, string> { }
+    public NetworkEvent mOnRecv = null;
+
+    public static NetworkClient mInst = null;
     public static NetworkClient Inst() { return mInst; }
+
+    TcpClient mClient = null;
+    bool isWaitReceive = false;
+
+    public NetworkClient() { mInst = this; }
+    public void Awake()
+    {
+        ConnectAndRecv("127.0.0.1", 9435);
+    }
 
     public bool ConnectAndRecv(string ip, int port)
     {
@@ -21,9 +33,12 @@ public class NetworkClient
         try
         {
             mClient = new TcpClient(ip, port);
-            isRunThread = true;
-            Task task = new Task(new Action(RunRecieve));
-            task.Start();
+            NetworkStream stream = mClient.GetStream();
+            isWaitReceive = true;
+            StartCoroutine(RunRecieve());
+
+            //Task task = new Task(new Action(RunRecieve));
+            //task.Start();
         }
         catch (Exception ex)
         {
@@ -34,15 +49,20 @@ public class NetworkClient
         return true;
     }
 
-    void RunRecieve()
+    IEnumerator RunRecieve()
     {
         byte[] outbuf = new byte[16 * 1024];
-        int nbytes;
-        try
+        int nbytes = 0;
+        NetworkStream stream = mClient.GetStream();
+        while (isWaitReceive)
         {
-            NetworkStream stream = mClient.GetStream();
-            while ((nbytes = stream.Read(outbuf, 0, outbuf.Length)) > 0 && isRunThread)
+            yield return new WaitForEndOfFrame();
+            if (!stream.DataAvailable)
+                continue;
+
+            try
             {
+                nbytes = stream.Read(outbuf, 0, outbuf.Length);
                 byte[] recvBuf = new byte[nbytes];
                 Array.Copy(outbuf, 0, recvBuf, 0, nbytes);
 
@@ -53,19 +73,15 @@ public class NetworkClient
                 IPEndPoint ep = (IPEndPoint)mClient.Client.RemoteEndPoint;
                 string ipAddress = ep.Address.ToString();
                 int port = ep.Port;
-                try
-                {
-                    ICD.stHeader.OnRecv(msg, ipAddress + ":" + port.ToString());
-                }
-                catch (Exception ex)
-                { Debug.Log(ex.ToString()); }
+                string info = ipAddress + ":" + port.ToString();
+                if (mOnRecv != null)
+                    mOnRecv.Invoke(msg, info);
+                //ICD.stHeader.OnRecv(msg, info);
             }
-            stream.Close();
+            catch (Exception ex)
+            { Debug.Log(ex.ToString()); }
         }
-        catch (Exception ex)
-        {
-            Debug.Log(ex.ToString());
-        }
+        stream.Close();
     }
 
     public bool SendToServer(byte[] data)
@@ -85,12 +101,16 @@ public class NetworkClient
         }
         return true;
     }
+    public bool SendMsgToServer(ICD.stHeader msg)
+    {
+        return SendToServer(msg.Serialize());
+    }
     public void Close()
     {
         if (mClient == null)
             return;
 
-        isRunThread = false;
+        isWaitReceive = false;
         NetworkStream st = mClient.GetStream();
         st.Close();
         mClient.Close();

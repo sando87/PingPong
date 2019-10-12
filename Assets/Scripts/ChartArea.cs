@@ -278,7 +278,36 @@ public class ChartArea : MonoBehaviour
 
         song.Bars = ExportToBars();
         byte[] buf = Utils.Serialize(song);
-        File.WriteAllBytes(Application.persistentDataPath + "/" + song.SongName + ".bytes", buf);
+
+        //File.WriteAllBytes(Application.persistentDataPath + "/" + song.SongName + ".bytes", buf);
+
+        ICD.CMD_FileUpload msg = new ICD.CMD_FileUpload();
+
+        string pureFilename = filename.Split('.')[0];
+
+        msg.musicInfo.id = -1;
+        msg.musicInfo.title = pureFilename;
+        msg.musicInfo.artist = "";
+        msg.musicInfo.userid = "lee";
+        msg.musicInfo.fn_meta = pureFilename;
+        msg.musicInfo.fn_img = pureFilename;
+        msg.musicInfo.fn_music = pureFilename;
+
+        msg.fileInfo.streamSize = buf.Length;
+        msg.fileInfo.filename = pureFilename;
+        msg.fileInfo.ext = "bytes";
+        msg.fileInfo.type = ICD.ICDDefines.FILETYPE_META;
+
+        msg.stream = buf;
+
+        msg.FillHeader(ICD.ICDDefines.CMD_Upload);
+
+        NetworkClient.Inst().SendMsgToServer(msg);
+    }
+    public void OnRecvUploadMusic(ICD.stHeader _msg, string _info)
+    {
+        Debug.Log(_msg.head.cmd);
+        Debug.Log(_msg.head.ack);
     }
     public void OnBtnCreateRandomTPs()
     {

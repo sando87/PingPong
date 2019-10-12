@@ -8287,6 +8287,7 @@ GameObject:
   - component: {fileID: 1074009280}
   - component: {fileID: 1074009281}
   - component: {fileID: 1074009279}
+  - component: {fileID: 1074009282}
   m_Layer: 0
   m_Name: SystemObject
   m_TagString: Untagged
@@ -8340,6 +8341,23 @@ MonoBehaviour:
     type: 3}
   Player: {fileID: 1156837842}
   audioSource: {fileID: 902475393}
+--- !u!114 &1074009282
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1074009278}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3efde9ae71c6aaf4b9b731e0f374744e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mOnRecv:
+    m_PersistentCalls:
+      m_Calls: []
+    m_TypeName: NetworkClient+NetworkEvent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral,
+      PublicKeyToken=null
 --- !u!1 &1074403591
 GameObject:
   m_ObjectHideFlags: 0
