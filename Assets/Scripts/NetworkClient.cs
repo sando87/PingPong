@@ -22,7 +22,8 @@ public class NetworkClient : MonoBehaviour
     public NetworkClient() { mInst = this; }
     public void Awake()
     {
-        ConnectAndRecv("127.0.0.1", 9435);
+        //ConnectAndRecv("27.117.158.178", 9435);
+        ConnectAndRecv("192.168.0.7", 9435);
     }
 
     public bool ConnectAndRecv(string ip, int port)

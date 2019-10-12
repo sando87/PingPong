@@ -22,7 +22,6 @@ public class Touch2DEvent : MonoBehaviour
     private const int mRangeClickTol = 5; //pixel unit
 
     private Canvas canvas;
-    private PointerEventData ped;
     private GraphicRaycaster gr;
 
     // Start is called before the first frame update
@@ -30,7 +29,7 @@ public class Touch2DEvent : MonoBehaviour
     {
         canvas = GameObject.Find("Canvas").GetComponent<Canvas>();
         gr = canvas.GetComponent<GraphicRaycaster>();
-        ped = new PointerEventData(null);
+        
     }
 
     // Update is called once per frame
@@ -38,6 +37,7 @@ public class Touch2DEvent : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
+            PointerEventData ped = new PointerEventData(null);
             ped.position = Input.mousePosition;
             var results = new List<RaycastResult>();
             gr.Raycast(ped, results);

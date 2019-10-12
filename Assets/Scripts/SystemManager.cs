@@ -32,7 +32,6 @@ public class SystemManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        LoadSongList();
         //CreateMusicTest();
     }
 
@@ -52,36 +51,7 @@ public class SystemManager : MonoBehaviour
                 break;
         }
     }
-
-    //PathInfo.MetaInfos 경로에 있는 곡 정보들을 로딩해서 첫화면(음악 리스트)을 구성한다.
-    void LoadSongList()
-    {
-        TextAsset[] assets = Resources.LoadAll<TextAsset>("MetaInfo/Basic");
-
-        foreach (TextAsset asset in assets)
-        {
-            Song song = Utils.Deserialize<Song>(asset.bytes);
-            GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, pnContents.transform);
-            ItemDisplay item = obj.GetComponent<ItemDisplay>();
-            item.SongInfo = song;
-        }
-
-        string path = Application.persistentDataPath;
-        DirectoryInfo dir = new DirectoryInfo(path);
-
-        FileSystemInfo[] items = dir.GetFileSystemInfos();
-        for (int i = 0; i < items.Length; i++)
-        {
-            if (items[i].Extension != ".bytes")
-                continue;
-
-            byte[] bytes = File.ReadAllBytes(items[i].FullName);
-            Song song = Utils.Deserialize<Song>(bytes);
-            GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, pnContents.transform);
-            ItemDisplay item = obj.GetComponent<ItemDisplay>();
-            item.SongInfo = song;
-        }
-    }
+        
     public void SelectSong(Song song)
     {
         CurrentSong = song;

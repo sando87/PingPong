@@ -124,11 +124,11 @@ namespace ICD
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     class CMD_MusicList : stHeader
     {
-        MusicInfos body;
+        public MusicInfos body;
         override public void Deserialize(byte[] data, int size = 0)
         {
             int count = BitConverter.ToInt32(data, HeaderSize());
-            body.musics = new MusicInfo[count];
+            body.musics = new Song[count];
             var gch = GCHandle.Alloc(data, GCHandleType.Pinned);
             Marshal.PtrToStructure(gch.AddrOfPinnedObject(), this);
             gch.Free();
@@ -192,7 +192,7 @@ namespace ICD
     public struct MusicInfos
     {
         public int count;
-        public MusicInfo[] musics;
+        public Song[] musics;
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     public struct FileInfo

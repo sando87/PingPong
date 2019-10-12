@@ -73,6 +73,7 @@
     <Compile Include="Assets\Scripts\ItemDisplay.cs" />
     <Compile Include="Assets\Scripts\MainCategory.cs" />
     <Compile Include="Assets\Scripts\MicrophoneTest.cs" />
+    <Compile Include="Assets\Scripts\MusicLoader.cs" />
     <Compile Include="Assets\Scripts\MyHorizontalLayoutGroup.cs" />
     <Compile Include="Assets\Scripts\NetworkClient.cs" />
     <Compile Include="Assets\Scripts\NetworkICD.cs" />
