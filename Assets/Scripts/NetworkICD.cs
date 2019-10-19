@@ -36,8 +36,8 @@ namespace ICD
                 { ICDDefines.CMD_NewUser        , new CMD_UserInfo()    },
                 { ICDDefines.CMD_UpdateScore    , new CMD_UserInfo()    },
                 { ICDDefines.CMD_MusicList      , new CMD_MusicList()   },
-                { ICDDefines.CMD_Upload         , new CMD_FileUpload()  },
-                { ICDDefines.CMD_Download       , new CMD_FileUpload()  },
+                { ICDDefines.CMD_Upload         , new CMD_SongFile()  },
+                { ICDDefines.CMD_Download       , new CMD_SongFile()  },
             };
     }
 
@@ -46,13 +46,13 @@ namespace ICD
     public class stHeader
     {
         public static DelOnRecv OnRecv;
-        public HEADER head;
+        public HEADER head = new HEADER();
 
         public ICD.stHeader FillHeader(int cmd)
         {
             head.startMagic = 0x1234;
             head.cmd = cmd;
-            head.len = Marshal.SizeOf(this);
+            head.len = TotalSize();
             head.ack = ICDDefines.ACK_REQ;
             return this;
         }
@@ -87,6 +87,10 @@ namespace ICD
             Marshal.PtrToStructure(gch.AddrOfPinnedObject(), this);
             gch.Free();
         }
+        virtual public int TotalSize()
+        {
+            return Marshal.SizeOf(this);
+        }
         public bool IsValid()
         {
             return head.startMagic == ICDDefines.MAGIC_START ? true : false;
@@ -95,8 +99,9 @@ namespace ICD
         {
             return Marshal.SizeOf(typeof(stHeader));
         }
-        static public stHeader Parse(byte[] buf)
+        static public stHeader Parse(byte[] buf, ref bool isError)
         {
+            isError = false;
             int headSize = HeaderSize();
             if (buf.Length < headSize)
                 return null;
@@ -106,11 +111,20 @@ namespace ICD
             stHeader header = new stHeader();
             header.Deserialize(headBuf);
             int msgSize = (int)header.head.len;
-            if (!header.IsValid() || buf.Length < msgSize)
+            if (!header.IsValid())
+            {
+                isError = true;
+                return null;
+            }
+
+            if (buf.Length < msgSize)
                 return null;
 
             if (!CmdTable.Pairs.ContainsKey(header.head.cmd))
+            {
+                isError = true;
                 return null;
+            }
 
             Type objType = CmdTable.Pairs[header.head.cmd].GetType();
             stHeader obj = (stHeader)Activator.CreateInstance(objType);
@@ -124,33 +138,73 @@ namespace ICD
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     class CMD_MusicList : stHeader
     {
-        public MusicInfos body;
+        public List<Song> musics = new List<Song>();
+        public override int TotalSize()
+        {
+            return HeaderSize() + Marshal.SizeOf(typeof(Song)) * musics.Count;
+        }
+        override public byte[] Serialize()
+        {
+            List<byte> buffer = new List<byte>();
+            buffer.AddRange(Utils.Serialize(head));
+            for (int i = 0; i < musics.Count; ++i)
+                buffer.AddRange(Utils.Serialize(musics[i]));
+
+            return buffer.ToArray();
+        }
         override public void Deserialize(byte[] data, int size = 0)
         {
-            int count = BitConverter.ToInt32(data, HeaderSize());
-            body.musics = new Song[count];
-            var gch = GCHandle.Alloc(data, GCHandleType.Pinned);
-            Marshal.PtrToStructure(gch.AddrOfPinnedObject(), this);
-            gch.Free();
+            Utils.Deserialize(ref head, data, HeaderSize());
+            int songSize = Marshal.SizeOf(typeof(Song));
+            int count = (data.Length - HeaderSize()) / songSize;
+            musics = new List<Song>();
+            for(int i = 0; i < count; ++i)
+            {
+                Song song = new Song();
+                byte[] tmpBuf = new byte[songSize];
+                Array.Copy(data, HeaderSize() + i * songSize, tmpBuf, 0, songSize);
+                Utils.Deserialize(ref song, tmpBuf);
+                musics.Add(song);
+            }
         }
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     class CMD_UserInfo : stHeader
     {
-        public UserInfo body;
+        public UserInfo body = new UserInfo();
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    class CMD_FileUpload : stHeader
+    class CMD_SongFile : stHeader
     {
-        public FileInfo fileInfo;
-        public MusicInfo musicInfo;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8 * 1024)]
-        public byte[] stream;
+        public Song song = new Song();
+        public List<byte> stream = new List<byte>();
+        public override int TotalSize()
+        {
+            return HeaderSize() + Marshal.SizeOf(typeof(Song)) + stream.Count;
+        }
+        override public byte[] Serialize()
+        {
+            List<byte> buffer = new List<byte>();
+            buffer.AddRange(Utils.Serialize(head));
+            buffer.AddRange(Utils.Serialize(song));
+            buffer.AddRange(stream.ToArray());
+            return buffer.ToArray();
+        }
+        override public void Deserialize(byte[] data, int size = 0)
+        {
+            Utils.Deserialize(ref head, data, HeaderSize(), 0);
+            Utils.Deserialize(ref song, data, Marshal.SizeOf(song), HeaderSize());
+            int count = data.Length - HeaderSize() - Marshal.SizeOf(song);
+            byte[] tmp = new byte[count];
+            Array.Copy(data, HeaderSize() + Marshal.SizeOf(song), tmp, 0, count);
+            stream = new List<byte>();
+            stream.AddRange(tmp);
+        }
     }
 
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct HEADER
+    public class HEADER
     {
         public int startMagic;
         public int cmd;
@@ -158,51 +212,45 @@ namespace ICD
         public int ack;
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct UserInfo
+    public class UserInfo
     {
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string username;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string password;
         public int score;
         public bool unknownUser;
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct MusicInfo
+    public class Song
     {
-        public int id;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string title;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string artist;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string userid;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string fn_meta;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string fn_img;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string fn_music;
-        public int playtime;
-        public int beat;
-        public int bpm;
-        public int startOff;
+        public int DBID;
+        public int BPM;
+        public float JumpDelay;
+        public PP.BeatType Beat;
+        public PP.FileType Type;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string UserID;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string FilePath;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string FileNameNoExt;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string Title;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string Artist;
+        public int Grade;
+        public int BarCount;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)]
+        public Bar[] Bars;
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct MusicInfos
+    public struct Bar
     {
-        public int count;
-        public Song[] musics;
+        public bool Main;
+        public bool Half;
+        public bool PreHalf;
+        public bool PostHalf;
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
-    public struct FileInfo
-    {
-        public int streamSize;
-        public int type;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string filename;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
-        public string ext;
 
-    }
 }

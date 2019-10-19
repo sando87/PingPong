@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿using ICD;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -32,7 +34,11 @@ public class MusicLoader : MonoBehaviour
                 continue;
 
             byte[] bytes = File.ReadAllBytes(items[i].FullName);
-            Song song = Utils.Deserialize<Song>(bytes);
+            Song song = new Song();
+            Utils.Deserialize(ref song, bytes);
+            Bar[] bars = new Bar[song.BarCount];
+            Array.Copy(song.Bars, bars, song.BarCount);
+            song.Bars = bars;
             GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, transform);
             mMusics.Add(obj);
             ItemDisplay item = obj.GetComponent<ItemDisplay>();
@@ -64,13 +70,12 @@ public class MusicLoader : MonoBehaviour
             return;
 
         ICD.CMD_MusicList msg = (ICD.CMD_MusicList)_msg;
-        for(int i = 0; i < msg.body.count; ++i)
+        for(int i = 0; i < msg.musics.Count; ++i)
         {
-            Song song = msg.body.musics[i];
             GameObject obj = Instantiate(prefabListItem, new Vector2(0, 0), Quaternion.identity, transform);
             mMusics.Add(obj);
             ItemDisplay item = obj.GetComponent<ItemDisplay>();
-            item.SongInfo = song;
+            item.SongInfo = msg.musics[i];
         }
     }
 }

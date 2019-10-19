@@ -1,4 +1,5 @@
-﻿using PP;
+﻿using ICD;
+using PP;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -265,26 +266,22 @@ public class ChartArea : MonoBehaviour
         string[] splits = mFileFullName.Split(new char[2] { '\\', '/' });
         string filename = splits[splits.Length - 1];
         Song song = new Song();
+        song.DBID = -1;
         song.BPM = mBPM; //128, 148, 162
         song.JumpDelay = mStartTime; //0.43f, 0.43f, 0.5f
         song.Beat = BeatType.B4B4;
-        song.Type = FileType.User;
-        song.FullName = mFileFullName;
-        song.SongFileName = ""; //GoAway, Hurt, YouAndI
-        song.TitleImageName = "";
-        song.SongName = filename.Split('.')[0];
-        song.SingerName = "";
+        song.Type = FileType.Local;
+        song.FilePath = String.Join("/", splits, 0, splits.Length - 1) + "/";
+        song.FileNameNoExt = splits[splits.Length - 1].Split('.')[0];
+        song.Title = song.FileNameNoExt;
+        song.Artist = "artist";
         song.Grade = 0;
 
         song.Bars = ExportToBars();
+        song.BarCount = song.Bars.Length;
         byte[] buf = Utils.Serialize(song);
 
-        File.WriteAllBytes(Application.persistentDataPath + "/" + song.SongName + ".bytes", buf);
-    }
-    public void OnRecvUploadMusic(ICD.stHeader _msg, string _info)
-    {
-        Debug.Log(_msg.head.cmd);
-        Debug.Log(_msg.head.ack);
+        File.WriteAllBytes(Application.persistentDataPath + "/" + song.FileNameNoExt + ".bytes", buf);
     }
     public void OnBtnCreateRandomTPs()
     {

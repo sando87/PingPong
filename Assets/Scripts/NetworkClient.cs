@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ICD;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net;
@@ -15,15 +16,16 @@ public class NetworkClient : MonoBehaviour
 
     public static NetworkClient mInst = null;
     public static NetworkClient Inst() { return mInst; }
+    public const int PACKET_SIZE = 16 * 1024;
 
     TcpClient mClient = null;
     bool isWaitReceive = false;
+    FifoBuffer mFifoBuffer = new FifoBuffer();
 
     public NetworkClient() { mInst = this; }
     public void Awake()
     {
-        //ConnectAndRecv("27.117.158.178", 9435);
-        ConnectAndRecv("192.168.0.7", 9435);
+        ConnectAndRecv("27.117.158.178", 9435);
     }
 
     public bool ConnectAndRecv(string ip, int port)
@@ -52,7 +54,7 @@ public class NetworkClient : MonoBehaviour
 
     IEnumerator RunRecieve()
     {
-        byte[] outbuf = new byte[16 * 1024];
+        byte[] outbuf = new byte[PACKET_SIZE];
         int nbytes = 0;
         NetworkStream stream = mClient.GetStream();
         while (isWaitReceive)
@@ -64,24 +66,33 @@ public class NetworkClient : MonoBehaviour
             try
             {
                 nbytes = stream.Read(outbuf, 0, outbuf.Length);
-                byte[] recvBuf = new byte[nbytes];
-                Array.Copy(outbuf, 0, recvBuf, 0, nbytes);
+                mFifoBuffer.Push(outbuf, nbytes);
 
-                ICD.stHeader msg = ICD.stHeader.Parse(recvBuf);
-                if (msg == null)
-                    continue;
+                while(true)
+                {
+                    byte[] buf = mFifoBuffer.readSize(mFifoBuffer.GetSize());
+                    bool isError = false;
+                    ICD.stHeader msg = ICD.stHeader.Parse(buf, ref isError);
+                    if (isError)
+                        mFifoBuffer.Clear();
 
-                IPEndPoint ep = (IPEndPoint)mClient.Client.RemoteEndPoint;
-                string ipAddress = ep.Address.ToString();
-                int port = ep.Port;
-                string info = ipAddress + ":" + port.ToString();
-                if (mOnRecv != null)
-                    mOnRecv.Invoke(msg, info);
-                //ICD.stHeader.OnRecv(msg, info);
+                    if (msg == null)
+                        break;
+                    else
+                        mFifoBuffer.Pop(msg.head.len);
+
+                    IPEndPoint ep = (IPEndPoint)mClient.Client.RemoteEndPoint;
+                    string ipAddress = ep.Address.ToString();
+                    int port = ep.Port;
+                    string info = ipAddress + ":" + port.ToString();
+                    if (mOnRecv != null)
+                        mOnRecv.Invoke(msg, info);
+                }
             }
             catch (Exception ex)
             { Debug.Log(ex.ToString()); }
         }
+        mFifoBuffer.Clear();
         stream.Close();
     }
 
@@ -93,7 +104,16 @@ public class NetworkClient : MonoBehaviour
         try
         {
             NetworkStream stream = mClient.GetStream();
-            stream.Write(data, 0, data.Length);
+            int currentSize = data.Length;
+            int off = 0;
+            do
+            {
+                int sendSize = Math.Min(currentSize, PACKET_SIZE);
+                stream.Write(data, off, sendSize);
+                off += sendSize;
+                currentSize -= sendSize;
+            } while (currentSize > 0);
+            
         }
         catch (Exception ex)
         {
@@ -104,7 +124,49 @@ public class NetworkClient : MonoBehaviour
     }
     public bool SendMsgToServer(ICD.stHeader msg)
     {
-        return SendToServer(msg.Serialize());
+        if (mClient == null)
+            return false;
+
+        if(msg.head.len > PACKET_SIZE * 32)
+            StartCoroutine("SendToServerAsync", msg.Serialize());
+        else
+            SendToServer(msg.Serialize());
+
+        return true;
+    }
+    IEnumerator SendToServerAsync(byte[] data)
+    {
+        LoadingBar loadingbar = LoadingBar.GetInst();
+        NetworkStream stream = mClient.GetStream();
+        int currentSize = data.Length;
+        int off = 0;
+        loadingbar.Show();
+        do
+        {
+            int sendSize = Math.Min(currentSize, PACKET_SIZE);
+            try { stream.Write(data, off, sendSize); }
+            catch (Exception ex) { Debug.Log(ex.ToString()); break; }
+            off += sendSize;
+            currentSize -= sendSize;
+            loadingbar.SetProgress(off / (float)data.Length);
+            yield return new WaitForEndOfFrame();
+        } while (currentSize > 0);
+        loadingbar.Hide();
+    }
+    public float GetProgressState()
+    {
+        int currentSize = mFifoBuffer.GetSize();
+        if (currentSize < stHeader.HeaderSize())
+            return 1f;
+
+        HEADER head = new HEADER();
+        byte[] headBuf = mFifoBuffer.readSize(stHeader.HeaderSize());
+        Utils.Deserialize(ref head, headBuf);
+        return currentSize / (float)head.len;
+    }
+    public bool IsRecvData()
+    {
+        return mFifoBuffer.GetSize() > 0 ? true : false;
     }
     public void Close()
     {

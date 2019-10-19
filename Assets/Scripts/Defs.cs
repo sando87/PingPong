@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace PP
 {
-    public enum FileType { None, Basic, User };
+    public enum FileType { None, Basic, Local, Download };
     public enum BeatType { None, B4B4, B3B4, B6B8, B2B2 };
     public enum CubeState { None, Ready, Jump, Fail, Success };
     public enum SystemState { None, UI, Standby, WaitJump, Playing, Finish };
@@ -34,12 +35,5 @@ namespace PP
         public short Q;
     }
 
-    [Serializable]
-    public struct Bar
-    {
-        public bool Main;
-        public bool Half;
-        public bool PreHalf;
-        public bool PostHalf;
-    }
+
 }

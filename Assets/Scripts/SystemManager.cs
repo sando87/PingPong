@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using PP;
 using UnityEngine.Networking;
+using UnityEngine.EventSystems;
+using ICD;
 
 /*
  * <SystemManager 클래스가 하는 일>
@@ -15,6 +17,9 @@ using UnityEngine.Networking;
 
 public class SystemManager : MonoBehaviour
 {
+    static private SystemManager mInst = null;
+    static public SystemManager Inst() { return mInst; }
+
     public GameObject pnContents;
     public GameObject prefabListItem;
     public GameObject pnRootUI;
@@ -30,9 +35,9 @@ public class SystemManager : MonoBehaviour
 
     private SystemState State = SystemState.None;
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
-        //CreateMusicTest();
+        mInst = this;
     }
 
     // Update is called once per frame
@@ -51,27 +56,84 @@ public class SystemManager : MonoBehaviour
                 break;
         }
     }
+
+    IEnumerator ShowProgressBar()
+    {
+        LoadingBar loadingbar = LoadingBar.GetInst();
+        loadingbar.Show();
         
+        while(!NetworkClient.Inst().IsRecvData())
+            yield return new WaitForEndOfFrame();
+
+        float rate = 0;
+        while (rate < 1f)
+        {
+            rate = NetworkClient.Inst().GetProgressState();
+            loadingbar.SetProgress(rate);
+            yield return new WaitForEndOfFrame();
+        }
+        loadingbar.Hide();
+    }
     public void SelectSong(Song song)
     {
-        CurrentSong = song;
-        UpdateCurve();
-        CreateTapPointScripts();
-
-        AudioClip clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.SongFileName);
-        if(clip != null)
+        if(song.BarCount == 0)
         {
-            audioSource.clip = clip;
+            ICD.CMD_SongFile msg = new ICD.CMD_SongFile();
+            msg.song = song;
+            msg.FillHeader(ICD.ICDDefines.CMD_Download);
+            NetworkClient.Inst().SendMsgToServer(msg);
+            StartCoroutine(ShowProgressBar());
+        }
+        else if(song.DBID == -1)
+        {
+            ICD.CMD_SongFile msg = new ICD.CMD_SongFile();
+            msg.song = song;
+            byte[] stream = File.ReadAllBytes(song.FilePath + song.FileNameNoExt + ".mp3");
+            msg.stream.AddRange(stream);
+            msg.FillHeader(ICD.ICDDefines.CMD_Upload);
+            NetworkClient.Inst().SendMsgToServer(msg);
         }
         else
         {
-            audioSource.clip = LoadAudioClip(CurrentSong.FullName);
-        }
-        
+            CurrentSong = song;
+            UpdateCurve();
+            CreateTapPointScripts();
 
-        State = SystemState.Standby;
-        pnRootUI.SetActive(false);
-        Player.ResetCube();
+            AudioClip clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.FileNameNoExt + ".mp3");
+            if (clip != null)
+            {
+                audioSource.clip = clip;
+            }
+            else
+            {
+                audioSource.clip = LoadAudioClip(CurrentSong.FilePath + CurrentSong.FileNameNoExt + ".mp3");
+            }
+
+
+            State = SystemState.Standby;
+            pnRootUI.SetActive(false);
+            Player.ResetCube();
+        }
+    }
+    public void OnClickItem(BaseEventData _data)
+    {
+        PointerEventData data = _data as PointerEventData;
+        ItemDisplay item = data.pointerEnter.GetComponentInParent<ItemDisplay>();
+        SelectSong(item.SongInfo);
+    }
+    public void OnRecvSong(ICD.stHeader _msg, string _info)
+    {
+        if (_msg.GetType() != typeof(CMD_SongFile))
+            return;
+
+        ICD.CMD_SongFile msg = (ICD.CMD_SongFile)_msg;
+        if(msg.head.cmd == ICD.ICDDefines.CMD_Download)
+        {
+            msg.song.FilePath = Application.persistentDataPath + "/";
+            File.WriteAllBytes(Application.persistentDataPath + "/" + msg.song.FileNameNoExt + ".mp3", msg.stream.ToArray());
+        }
+        byte[] buf = Utils.Serialize(msg.song);
+        File.WriteAllBytes(Application.persistentDataPath + "/" + msg.song.FileNameNoExt + ".bytes", buf);
     }
     public AudioClip LoadAudioClip(string filename)
     {
@@ -187,32 +249,5 @@ public class SystemManager : MonoBehaviour
     public TabInfo GetTapInfo(int index)
     {
         return tabPoints[index];
-    }
-
-
-    public void CreateMusicTest()
-    {
-        Song song = new Song();
-        song.BPM = 162; //128, 148, 162
-        song.JumpDelay = 0.5f; //0.43f, 0.43f, 0.5f
-        song.Beat = BeatType.B4B4;
-        song.FullName = "";
-        song.SongFileName = "YouAndI"; //GoAway, Hurt, YouAndI
-        song.TitleImageName = "2ne1_chart1";
-        song.SongName = "YouAndI";
-        song.SingerName = "2NE1";
-        song.Grade = 0;
-
-        song.Bars = new Bar[256];
-        for (int i = 0; i < song.Bars.Length; ++i)
-        {
-            song.Bars[i].Main = true;
-            song.Bars[i].Half = UnityEngine.Random.Range(0, 5) == 1 ? true : false;
-            song.Bars[i].PostHalf = UnityEngine.Random.Range(0, 8) == 1 ? true : false;
-            song.Bars[i].PreHalf = UnityEngine.Random.Range(0, 8) == 1 ? true : false;
-        }
-
-        byte[] buf = Utils.Serialize(song);
-        File.WriteAllBytes(PathInfo.BasicSongs + song.SongName + ".bytes", buf);
     }
 }

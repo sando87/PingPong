@@ -4,31 +4,55 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 
 public class Utils
 {
-    public static byte[] Serialize(object obj)
+    static public byte[] Serialize(object obj)
     {
-        using (var memoryStream = new MemoryStream())
-        {
-            BinaryFormatter bf = new BinaryFormatter();
-            bf.Serialize(memoryStream, obj);
-            memoryStream.Flush();
-            memoryStream.Position = 0;
-            return memoryStream.ToArray();
-        }
+        var buffer = new byte[Marshal.SizeOf(obj)];
+        var gch = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        var pBuffer = gch.AddrOfPinnedObject();
+        Marshal.StructureToPtr(obj, pBuffer, false);
+        gch.Free();
+
+        return buffer;
     }
-    public static T Deserialize<T>(byte[] buf)
+    static public void Deserialize<T>(ref T obj, byte[] data, int size = 0, int off = 0)
     {
-        using (var stream = new MemoryStream(buf))
+        byte[] buf = data;
+        if (size > 0)
         {
-            var formatter = new BinaryFormatter();
-            stream.Seek(0, SeekOrigin.Begin);
-            return (T)formatter.Deserialize(stream);
+            byte[] tmp = new byte[size];
+            Array.Copy(data, off, tmp, 0, size);
+            buf = tmp;
         }
+        var gch = GCHandle.Alloc(buf, GCHandleType.Pinned);
+        Marshal.PtrToStructure(gch.AddrOfPinnedObject(), obj);
+        gch.Free();
     }
+    //public static byte[] Serialize(object obj)
+    //{
+    //    using (var memoryStream = new MemoryStream())
+    //    {
+    //        BinaryFormatter bf = new BinaryFormatter();
+    //        bf.Serialize(memoryStream, obj);
+    //        memoryStream.Flush();
+    //        memoryStream.Position = 0;
+    //        return memoryStream.ToArray();
+    //    }
+    //}
+    //public static T Deserialize<T>(byte[] buf)
+    //{
+    //    using (var stream = new MemoryStream(buf))
+    //    {
+    //        var formatter = new BinaryFormatter();
+    //        stream.Seek(0, SeekOrigin.Begin);
+    //        return (T)formatter.Deserialize(stream);
+    //    }
+    //}
 
     static public double[] FFT(stIQ[] _iq)
     {
