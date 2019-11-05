@@ -25,8 +25,8 @@ public class BackCube : MonoBehaviour
     {
         //PosFromMainCube.y -= (0.1f * Time.deltaTime);
         Vector3 offPos = MainCube.transform.position * Depth * 0.1f;
-        transform.position = MainCube.transform.position + PosFromMainCube;
-        transform.position -= offPos;
+        //transform.position = MainCube.transform.position + PosFromMainCube;
+        //transform.position -= offPos;
         transform.Rotate(RotateAxis, 1.0f);
     }
 }

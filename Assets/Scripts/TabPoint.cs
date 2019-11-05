@@ -17,21 +17,25 @@ public class TabPoint : MonoBehaviour
     public float RoundSecondOut = 0.0f;
     int AngleStepCount = 36;
     Vector3[] Circle = null;
+    Material mMaterial;
 
     public TabInfo TapInfo { get; set; }
     private void Start()
     {
+        mMaterial = GetComponent<Renderer>().material;
         mf = GetComponent<MeshFilter>();
         mr = GetComponent<MeshRenderer>();
         animator = GetComponent<Animator>();
         //InitCircleVertices();
-        UpdateCircleMesh();
+        //UpdateCircleMesh();
+        InitMesh();
     }
 
     // Update is called once per frame
     void Update()
     {
-        UpdateCircleMesh();
+        //UpdateCircleMesh();
+        UpdateTP();
     }
     public bool IsFinalTab()
     {
@@ -116,5 +120,64 @@ public class TabPoint : MonoBehaviour
         color.a = FadeOut;
         mr.material.color = color;
         return true;
+    }
+    public bool InitMesh()
+    {
+        if (mf == null || mMaterial == null)
+            return false;
+
+
+        int stepCount = 36;
+        Vector2[] factors = new Vector2[(stepCount + 1) * 4];
+
+        List<Vector3> circleList = new List<Vector3>();
+        for (int idx = 0; idx <= stepCount; idx++)
+        {
+            circleList.Add(new Vector3(1, 0, 0));
+            factors[(stepCount + 1) * 0 + idx] = new Vector2((float)idx / stepCount, 0);
+            factors[(stepCount + 1) * 1 + idx] = new Vector2((float)idx / stepCount, 1);
+            factors[(stepCount + 1) * 2 + idx] = new Vector2((float)idx / stepCount, 2);
+            factors[(stepCount + 1) * 3 + idx] = new Vector2((float)idx / stepCount, 3);
+        }
+        Vector3[] circles = circleList.ToArray();
+
+        List<Vector3> verticies = new List<Vector3>();
+        verticies.AddRange(circles);
+        verticies.AddRange(circles);
+        verticies.AddRange(circles);
+        verticies.AddRange(circles);
+
+        List<int> indicies = new List<int>();
+        int n = circles.Length;
+        for (int idx = 0; idx < n - 1; idx++)
+        {
+            indicies.AddRange(new int[3] { idx, n + idx + 1, n + idx });
+            indicies.AddRange(new int[3] { idx, idx + 1, n + idx + 1 });
+        }
+        for (int idx = 0; idx < n - 1; idx++)
+        {
+            indicies.AddRange(new int[3] { 2 * n + idx, 3 * n + idx + 1, 3 * n + idx });
+            indicies.AddRange(new int[3] { 2 * n + idx, 2 * n + idx + 1, 3 * n + idx + 1 });
+        }
+
+
+        mf.mesh.vertices = verticies.ToArray();
+        mf.mesh.triangles = indicies.ToArray();
+        mf.mesh.uv = factors;
+
+        mMaterial.SetColor("_Color", Color.gray);
+        //Color color = mr.material.color;
+        //color.a = FadeOut;
+        //mr.material.color = color;
+
+        return true;
+    }
+    public void UpdateTP()
+    {
+        Color color = Color.gray;
+        color.a = FadeOut;
+        mMaterial.SetColor("_Color", color);
+        mMaterial.SetVector("_Rounds", new Vector4(RoundFirstIn, RoundFirstOut, RoundSecondIn, RoundSecondOut));
+        mMaterial.SetFloat("_Rotate", AngleFactor * Mathf.PI * 2);
     }
 }

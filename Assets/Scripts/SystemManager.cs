@@ -33,6 +33,8 @@ public class SystemManager : MonoBehaviour
     private int IndexNextTP = 0;
     private List<TabInfo> tabPoints = new List<TabInfo>();
 
+    CacheSystem<AudioClip> mCacheMusic = new CacheSystem<AudioClip>();
+
     private SystemState State = SystemState.None;
     // Start is called before the first frame update
     void Awake()
@@ -76,7 +78,7 @@ public class SystemManager : MonoBehaviour
     }
     public void SelectSong(Song song)
     {
-        if(song.BarCount == 0)
+        if (song.BarCount == 0)
         {
             ICD.CMD_SongFile msg = new ICD.CMD_SongFile();
             msg.song = song;
@@ -84,31 +86,18 @@ public class SystemManager : MonoBehaviour
             NetworkClient.Inst().SendMsgToServer(msg);
             StartCoroutine(ShowProgressBar());
         }
-        else if(song.DBID == -1)
-        {
-            ICD.CMD_SongFile msg = new ICD.CMD_SongFile();
-            msg.song = song;
-            byte[] stream = File.ReadAllBytes(song.FilePath + song.FileNameNoExt + ".mp3");
-            msg.stream.AddRange(stream);
-            msg.FillHeader(ICD.ICDDefines.CMD_Upload);
-            NetworkClient.Inst().SendMsgToServer(msg);
-        }
         else
         {
             CurrentSong = song;
             UpdateCurve();
             CreateTapPointScripts();
 
-            AudioClip clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.FileNameNoExt + ".mp3");
-            if (clip != null)
+            audioSource.clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.FileNameNoExt + ".mp3");
+            if (audioSource.clip == null)
             {
-                audioSource.clip = clip;
+                string fullname = CurrentSong.FilePath + CurrentSong.FileNameNoExt + ".mp3";
+                audioSource.clip = mCacheMusic.CacheOrLoad(fullname, (name) => { return LoadAudioClip(name); });
             }
-            else
-            {
-                audioSource.clip = LoadAudioClip(CurrentSong.FilePath + CurrentSong.FileNameNoExt + ".mp3");
-            }
-
 
             State = SystemState.Standby;
             pnRootUI.SetActive(false);

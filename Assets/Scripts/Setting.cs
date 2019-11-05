@@ -14,6 +14,6 @@ public class Setting : MonoBehaviour
 
     public void SetMusicDelay(float value)
     {
-        MusicDelay = value;
+        MusicDelay = value; // -0.5f ~ 0.5f
     }
 }

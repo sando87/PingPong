@@ -27,7 +27,7 @@ public class NetworkClient : MonoBehaviour
     {
         ConnectAndRecv("27.117.158.178", 9435);
     }
-
+    public bool IsConnected() { return mClient == null ? false : true; }
     public bool ConnectAndRecv(string ip, int port)
     {
         if (mClient != null)
@@ -35,7 +35,14 @@ public class NetworkClient : MonoBehaviour
 
         try
         {
-            mClient = new TcpClient(ip, port);
+            mClient = new TcpClient();
+            var result = mClient.BeginConnect(ip, port, null, null);
+            var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+            if (!success)
+                throw new Exception("Failed to connect.");
+
+            mClient.EndConnect(result);
+
             NetworkStream stream = mClient.GetStream();
             isWaitReceive = true;
             StartCoroutine(RunRecieve());
@@ -45,6 +52,7 @@ public class NetworkClient : MonoBehaviour
         }
         catch (Exception ex)
         {
+            mClient = null;
             Debug.Log(ex.ToString());
             return false;
         }
