@@ -22,6 +22,7 @@ public class CubePlayer : MonoBehaviour
         cam = GameObject.Find("Main Camera").GetComponent<Camera>();
 
         State = CubeState.Ready;
+        gameObject.SetActive(false);
     }
 
     void Update()
@@ -63,6 +64,7 @@ public class CubePlayer : MonoBehaviour
 
             TouchTabPoint();
 
+            ps.Clear(true);
             ps.transform.position = transform.position;
             ps.Play();
 
@@ -78,14 +80,10 @@ public class CubePlayer : MonoBehaviour
     void DoFail()
     {
         State = CubeState.Ready;
-        SysMgr.StopJump();
-        gameObject.SetActive(false);
     }
     void DoSuccess()
     {
         State = CubeState.Ready;
-        SysMgr.StopJump();
-        gameObject.SetActive(false);
     }
 
     void UpdateCubeGraph()
@@ -95,9 +93,9 @@ public class CubePlayer : MonoBehaviour
         float xx = tp.worldPos.x - transform.position.x;
         float yetTime = Curve.GetLinearT(xx); //나가는 방향으로 안쪽에 있으면 +
 
-        float nextTime = tp.idxStepToNext * Setting.TimePerBar * 0.25f;
+        float nextTime = tp.idxStepToNext * Setting.Inst().TimePerBar * 0.25f;
         float time = nextTime + yetTime;
-        float dist = xx - nextTime * Setting.SpeedMoveX * DirRight;
+        float dist = xx - nextTime * Setting.Inst().SpeedMoveX * DirRight;
         Curve.UpdateLinear(dist, time); //X축 방향 그래프 기울기 조정
 
 
@@ -105,16 +103,16 @@ public class CubePlayer : MonoBehaviour
         float baseT = 0;
         if (tp.idxStepToNext == 4)
         {
-            float fixedH = Setting.JumpHeight - offsetY;
+            float fixedH = Setting.Inst().JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = -offsetY;
             baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
         else if (tp.idxStepToNext == 3)
         {
-            float fixedH = Setting.JumpHeight - offsetY;
+            float fixedH = Setting.Inst().JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
-            float fixedY = Setting.JumpHeightHalf - offsetY;
+            float fixedY = Setting.Inst().JumpHeightHalf - offsetY;
             baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
         else if (tp.idxStepToNext == 2)
@@ -123,20 +121,20 @@ public class CubePlayer : MonoBehaviour
         }
         else if (tp.idxStepToNext == 1)
         {
-            float fixedH = Setting.JumpHeight - offsetY;
+            float fixedH = Setting.Inst().JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
-            float fixedY = Setting.JumpHeightHalf - offsetY;
+            float fixedY = Setting.Inst().JumpHeightHalf - offsetY;
             baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, true);
         }
         else
         {
-            float fixedH = Setting.JumpHeight - offsetY;
+            float fixedH = Setting.Inst().JumpHeight - offsetY;
             float fixedT = nextTime + yetTime;
             float fixedY = tpNext.worldPos.y - tp.worldPos.y - offsetY;
             baseT = Curve.CalcBaseT(fixedH, fixedT, fixedY, false);
         }
 
-        float baseY = Setting.JumpHeight - offsetY;
+        float baseY = Setting.Inst().JumpHeight - offsetY;
         Curve.UpdateCurve(new Vector2(baseT, baseY), new Vector2(0, 0)); //Y축 방향 곡선 그래프 계수 조정
     }
     bool CheckPassFail()
@@ -145,19 +143,28 @@ public class CubePlayer : MonoBehaviour
         if(tp == null)
         {
             State = CubeState.Fail;
+            SysMgr.StopJump();
+            gameObject.SetActive(false);
+            MessageBox.Show("GameOver", "Failed", null);
             return true;
         }
         float x = tp.transform.position.x - transform.position.x;
         float time = Curve.GetLinearT(x);
-        float tolerance = Setting.TimePerBar * Setting.RatePassFail;
+        float tolerance = Setting.Inst().TimePerBar * Setting.Inst().RatePassFail;
         if (Mathf.Abs(time) > tolerance)
         {
             State = CubeState.Fail;
+            SysMgr.StopJump();
+            gameObject.SetActive(false);
+            MessageBox.Show("GameOver", "Failed", null);
             return true;
         }
         else if (tp.IsFinalTab())
         {
             State = CubeState.Success;
+            SysMgr.StopJump();
+            gameObject.SetActive(false);
+            MessageBox.Show("Success", "Success", null);
             return true;
         }
         return false;
@@ -176,14 +183,14 @@ public class CubePlayer : MonoBehaviour
         TabResetTime += Time.deltaTime;
         pos.y = TabPositionY + Curve.GetCurveY(TabResetTime);
         transform.position = pos;
-        transform.Rotate(new Vector3(0, 0, -1), DirRight * Setting.SpeedRotate * Time.deltaTime);
+        transform.Rotate(new Vector3(0, 0, -1), DirRight * Setting.Inst().SpeedRotate * Time.deltaTime);
     }
     void TouchTabPoint()
     {
         TabPoint tp = SysMgr.GetTapInfo(TabIndex).script;
         float x = tp.transform.position.x - transform.position.x;
         float time = Curve.GetLinearT(x);
-        float tolerance = Setting.TimePerBar * Setting.RateAccuracy;
+        float tolerance = Setting.Inst().TimePerBar * Setting.Inst().RateAccuracy;
         if (Mathf.Abs(time) < tolerance)
         {
             tp.CleanHit();

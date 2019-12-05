@@ -25,7 +25,9 @@ public class NetworkClient : MonoBehaviour
     public NetworkClient() { mInst = this; }
     public void Awake()
     {
-        ConnectAndRecv("27.117.158.178", 9435);
+        //ConnectAndRecv("27.117.158.3", 9435);
+        //ConnectAndRecv("119.82.53.97", 9435);
+        ConnectAndRecv("sjleeserver.iptime.org", 9435);
     }
     public bool IsConnected() { return mClient == null ? false : true; }
     public bool ConnectAndRecv(string ip, int port)
@@ -144,11 +146,10 @@ public class NetworkClient : MonoBehaviour
     }
     IEnumerator SendToServerAsync(byte[] data)
     {
-        LoadingBar loadingbar = LoadingBar.GetInst();
+        LoadingBar loadingbar = LoadingBar.Show();
         NetworkStream stream = mClient.GetStream();
         int currentSize = data.Length;
         int off = 0;
-        loadingbar.Show();
         do
         {
             int sendSize = Math.Min(currentSize, PACKET_SIZE);

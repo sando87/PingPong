@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
+using UnityEngine.Networking;
 
 public class Utils
 {
@@ -33,26 +34,26 @@ public class Utils
         Marshal.PtrToStructure(gch.AddrOfPinnedObject(), obj);
         gch.Free();
     }
-    //public static byte[] Serialize(object obj)
-    //{
-    //    using (var memoryStream = new MemoryStream())
-    //    {
-    //        BinaryFormatter bf = new BinaryFormatter();
-    //        bf.Serialize(memoryStream, obj);
-    //        memoryStream.Flush();
-    //        memoryStream.Position = 0;
-    //        return memoryStream.ToArray();
-    //    }
-    //}
-    //public static T Deserialize<T>(byte[] buf)
-    //{
-    //    using (var stream = new MemoryStream(buf))
-    //    {
-    //        var formatter = new BinaryFormatter();
-    //        stream.Seek(0, SeekOrigin.Begin);
-    //        return (T)formatter.Deserialize(stream);
-    //    }
-    //}
+    public static byte[] Serialize_CS(object obj)
+    {
+        using (var memoryStream = new MemoryStream())
+        {
+            BinaryFormatter bf = new BinaryFormatter();
+            bf.Serialize(memoryStream, obj);
+            memoryStream.Flush();
+            memoryStream.Position = 0;
+            return memoryStream.ToArray();
+        }
+    }
+    public static T Deserialize_CS<T>(byte[] buf)
+    {
+        using (var stream = new MemoryStream(buf))
+        {
+            var formatter = new BinaryFormatter();
+            stream.Seek(0, SeekOrigin.Begin);
+            return (T)formatter.Deserialize(stream);
+        }
+    }
 
     static public double[] FFT(stIQ[] _iq)
     {
@@ -126,5 +127,30 @@ public class Utils
     static private bool IsSquare(int x) //2의 거듭제곱인지 판별
     {
         return (x & (x - 1)) == 0 ? true : false;
+    }
+    static public AudioClip LoadMusic(string filename)
+    {
+        string url = "file://" + filename;
+        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
+        {
+            www.SendWebRequest();
+            while (!www.isDone) { }
+            if (www.isNetworkError)
+                return null;
+
+            return DownloadHandlerAudioClip.GetContent(www);
+        }
+    }
+    static public ICD.Bar[] CreateRandomBars(int count)
+    {
+        ICD.Bar[] bars = new ICD.Bar[count];
+        for (int i = 0; i < bars.Length; ++i)
+        {
+            bars[i].Main = true;
+            bars[i].Half = UnityEngine.Random.Range(0, 3) == 1 ? true : false;
+            bars[i].PostHalf = UnityEngine.Random.Range(0, 7) == 1 ? true : false;
+            bars[i].PreHalf = UnityEngine.Random.Range(0, 5) == 1 ? true : false;
+        }
+        return bars;
     }
 }

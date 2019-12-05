@@ -7,8 +7,17 @@ using UnityEngine.Networking;
 
 public class BMPDector
 {
+    public class AudioInfo
+    {
+        public int frequency;
+        public float length;
+        public int samples;
+        public int channels;
+        public float[] buffer;
+    }
     private string path = "C:\\Users\\lee\\Desktop\\FFX_GUI_Music - 복사본\\musics\\sample3.mp3";
     private AudioClip mClip;
+    private AudioInfo mClipInfo;
     private const int mDivFactor = 4; //44100 -> 11025Hz로 샘플 다운해서 계산(계산 속도를 빠르게 하기 위해)
     private const int mFFTCount = 256; //FFT 샘플링 개수 : 
     private const double mDetectSpan = 1.0; //200ms
@@ -23,15 +32,16 @@ public class BMPDector
 
     public AudioClip GetAudioClip() { return mClip; }
     public double GetFirstBeat() { return mStartTime; }
-    public int[] DetectBPM(AudioClip clip)
+    public int[] DetectBPM(AudioInfo clip)
     {
         Reset();
 
         //LoadAudioClip();
-        mClip = clip;
+        //mClip = clip;
+        mClipInfo = clip;
 
-        mDT = 1.0 / (mClip.frequency / mDivFactor);
-        mSpectrumStep = 1.0 / ((mClip.frequency / (double)mDivFactor) / mFFTCount);
+        mDT = 1.0 / (mClipInfo.frequency / mDivFactor);
+        mSpectrumStep = 1.0 / ((mClipInfo.frequency / (double)mDivFactor) / mFFTCount);
 
         LoadSamples(mDivFactor);
 
@@ -133,7 +143,7 @@ public class BMPDector
     private int SyncBPM(double off, int bpm)
     {
         double stepTime = 120.0 / bpm;
-        int endIdx = (int)(mClip.length / stepTime);
+        int endIdx = (int)(mClipInfo.length / stepTime);
         double deltaFreqsTime = mSpectrumStep;
         int spanIdx = (int)(mDetectSpan / mSpectrumStep) / 2;
         int[] peaks = new int[spanIdx * 2 + 1];
@@ -171,18 +181,18 @@ public class BMPDector
     private void LoadSamples(double divSampleRateFactor, double startTime = 0, double spanTime = 0)
     {
         int div = (int)divSampleRateFactor;
-        long len = mClip.samples * mClip.channels;
-        float[] buf = new float[len];
-        mClip.GetData(buf, 0);
-        int sampleCnt = mClip.samples;
-        double dt = 1 / (double)mClip.frequency;
+        long len = mClipInfo.samples * mClipInfo.channels;
+        //float[] buf = new float[len];
+        //mClip.GetData(buf, 0);
+        int sampleCnt = mClipInfo.samples;
+        double dt = 1 / (double)mClipInfo.frequency;
         int startOffIdx = (int)(startTime / dt);
         int spanIdx = startOffIdx + (int)(spanTime / dt);
         spanIdx = spanTime == 0 ? sampleCnt : spanIdx;
         List<double> list = new List<double>();
         for (int idx = startOffIdx; idx < spanIdx; idx += div)
         {
-            float val = ReadSample(buf, idx);
+            float val = ReadSample(mClipInfo.buffer, idx);
             list.Add(val);
         }
         mSamples = list.ToArray();
@@ -190,8 +200,8 @@ public class BMPDector
     private float ReadSample(float[] buf, int idx)
     {
         float ret = 0;
-        for (int i = 0; i < mClip.channels; ++i)
-            ret += buf[mClip.channels * idx + i];
+        for (int i = 0; i < mClipInfo.channels; ++i)
+            ret += buf[mClipInfo.channels * idx + i];
         return ret;
     }
     private double[] FFT(int off, int count)
@@ -215,6 +225,7 @@ public class BMPDector
     }
     private void Reset()
     {
+        mClipInfo = null;
         mClip = null;
         mSamples = null;
         mDT = 0;
@@ -225,7 +236,7 @@ public class BMPDector
     {
         int cnt = mFFTCount;
         double curTime = 0;
-        while (curTime < mClip.length)
+        while (curTime < mClipInfo.length)
         {
             int offIdx = (int)(curTime / mDT) - cnt;
             if (offIdx >= 0)

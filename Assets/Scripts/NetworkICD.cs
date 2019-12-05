@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -16,6 +17,7 @@ namespace ICD
         public const int CMD_NewUser = 4;
         public const int CMD_UpdateScore = 5;
         public const int CMD_GetUserInfo = 6;
+        public const int CMD_LoggingUser = 7;
 
         public const int ACK_REQ = 1;
         public const int ACK_REP = 2;
@@ -34,6 +36,7 @@ namespace ICD
                 { ICDDefines.CMD_NONE           , new stHeader()        },
                 { ICDDefines.CMD_GetUserInfo    , new CMD_UserInfo()    },
                 { ICDDefines.CMD_NewUser        , new CMD_UserInfo()    },
+                { ICDDefines.CMD_LoggingUser   , new CMD_UserInfo()    },
                 { ICDDefines.CMD_UpdateScore    , new CMD_UserInfo()    },
                 { ICDDefines.CMD_MusicList      , new CMD_MusicList()   },
                 { ICDDefines.CMD_Upload         , new CMD_SongFile()  },
@@ -42,7 +45,7 @@ namespace ICD
     }
 
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     public class stHeader
     {
         public static DelOnRecv OnRecv;
@@ -135,18 +138,20 @@ namespace ICD
     }
 
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     class CMD_MusicList : stHeader
     {
+        public int method;
         public List<Song> musics = new List<Song>();
         public override int TotalSize()
         {
-            return HeaderSize() + Marshal.SizeOf(typeof(Song)) * musics.Count;
+            return HeaderSize() + sizeof(int) + Marshal.SizeOf(typeof(Song)) * musics.Count;
         }
         override public byte[] Serialize()
         {
             List<byte> buffer = new List<byte>();
             buffer.AddRange(Utils.Serialize(head));
+            buffer.AddRange(BitConverter.GetBytes(method));
             for (int i = 0; i < musics.Count; ++i)
                 buffer.AddRange(Utils.Serialize(musics[i]));
 
@@ -155,25 +160,27 @@ namespace ICD
         override public void Deserialize(byte[] data, int size = 0)
         {
             Utils.Deserialize(ref head, data, HeaderSize());
-            int songSize = Marshal.SizeOf(typeof(Song));
-            int count = (data.Length - HeaderSize()) / songSize;
+            method = BitConverter.ToInt32(data, HeaderSize());
+            int arrayOff = HeaderSize() + sizeof(int);
+            int songSize = Marshal.SizeOf(typeof(Song)); 
+            int count = (data.Length - arrayOff) / songSize;
             musics = new List<Song>();
             for(int i = 0; i < count; ++i)
             {
                 Song song = new Song();
                 byte[] tmpBuf = new byte[songSize];
-                Array.Copy(data, HeaderSize() + i * songSize, tmpBuf, 0, songSize);
+                Array.Copy(data, arrayOff + i * songSize, tmpBuf, 0, songSize);
                 Utils.Deserialize(ref song, tmpBuf);
                 musics.Add(song);
             }
         }
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     class CMD_UserInfo : stHeader
     {
         public UserInfo body = new UserInfo();
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     class CMD_SongFile : stHeader
     {
         public Song song = new Song();
@@ -203,7 +210,7 @@ namespace ICD
     }
 
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     public class HEADER
     {
         public int startMagic;
@@ -211,24 +218,26 @@ namespace ICD
         public int len;
         public int ack;
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     public class UserInfo
     {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string username;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string password;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string devicename;
         public int score;
-        public bool unknownUser;
+        public int reserve;
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     public class Song
     {
         public int DBID;
         public int BPM;
-        public float JumpDelay;
-        public PP.BeatType Beat;
-        public PP.FileType Type;
+        public float StartTime;
+        public float EndTime;
+        public float SyncTime;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string UserID;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
@@ -239,12 +248,20 @@ namespace ICD
         public string Title;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
         public string Artist;
-        public int Grade;
+        public long CreateDate;
+        public long LastEditDate;
+        public long LastPlayDate;
+        public int StarCount;
         public int BarCount;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)]
         public Bar[] Bars;
+        public bool Playable() { return Bars != null && Bars.Length > 0; }
+        public bool Downloadable() { return (UserID == PP.Defs.ADMIN_USERNAME) ? false : DBID != -1; }
+        public bool NeedUpdate() { return (UserID == PP.Defs.ADMIN_USERNAME) ? false : DBID == -1; }
+        public bool Editalbe() { return (UserID == PP.Defs.ADMIN_USERNAME) ? false : DBID == -1 && Setting.Inst().UserName == UserID; }
+        public bool Deletable() { return (UserID == PP.Defs.ADMIN_USERNAME) ? false : File.Exists(Application.persistentDataPath + "/" + FileNameNoExt + ".bytes"); }
     }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
     public struct Bar
     {
         public bool Main;

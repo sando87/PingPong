@@ -24,6 +24,8 @@ public class SystemManager : MonoBehaviour
     public GameObject prefabListItem;
     public GameObject pnRootUI;
     public GameObject PrefabTapPoint;
+    public GameObject CountDownObject;
+    public Sprite[] Numbers = new Sprite[3];
 
     public CubePlayer Player;
     public AudioSource audioSource;
@@ -41,12 +43,14 @@ public class SystemManager : MonoBehaviour
     {
         mInst = this;
     }
-
+    
     // Update is called once per frame
     void Update()
     {
-        switch(State)
+        switch (State)
         {
+            case SystemState.UIMode:
+                break;
             case SystemState.Standby:
                 if (Input.GetMouseButtonDown(0))
                     PlaySong();
@@ -59,94 +63,38 @@ public class SystemManager : MonoBehaviour
         }
     }
 
-    IEnumerator ShowProgressBar()
-    {
-        LoadingBar loadingbar = LoadingBar.GetInst();
-        loadingbar.Show();
-        
-        while(!NetworkClient.Inst().IsRecvData())
-            yield return new WaitForEndOfFrame();
-
-        float rate = 0;
-        while (rate < 1f)
-        {
-            rate = NetworkClient.Inst().GetProgressState();
-            loadingbar.SetProgress(rate);
-            yield return new WaitForEndOfFrame();
-        }
-        loadingbar.Hide();
-    }
     public void SelectSong(Song song)
     {
-        if (song.BarCount == 0)
+        CurrentSong = song;
+        UpdateCurve();
+        CreateTapPointScripts();
+
+        if(CurrentSong.UserID == Defs.ADMIN_USERNAME)
         {
-            ICD.CMD_SongFile msg = new ICD.CMD_SongFile();
-            msg.song = song;
-            msg.FillHeader(ICD.ICDDefines.CMD_Download);
-            NetworkClient.Inst().SendMsgToServer(msg);
-            StartCoroutine(ShowProgressBar());
+            audioSource.clip = Resources.Load<AudioClip>(PathInfo.DefaultMusics + "/" + CurrentSong.FileNameNoExt);
         }
         else
         {
-            CurrentSong = song;
-            UpdateCurve();
-            CreateTapPointScripts();
-
-            audioSource.clip = Resources.Load<AudioClip>(PathInfo.AudioClip + CurrentSong.FileNameNoExt + ".mp3");
-            if (audioSource.clip == null)
-            {
-                string fullname = CurrentSong.FilePath + CurrentSong.FileNameNoExt + ".mp3";
-                audioSource.clip = mCacheMusic.CacheOrLoad(fullname, (name) => { return LoadAudioClip(name); });
-            }
-
-            State = SystemState.Standby;
-            pnRootUI.SetActive(false);
-            Player.ResetCube();
+            string fullname = CurrentSong.FilePath + CurrentSong.FileNameNoExt + ".mp3";
+            audioSource.clip = mCacheMusic.CacheOrLoad(fullname, (name) => { return Utils.LoadMusic(name); });
         }
-    }
-    public void OnClickItem(BaseEventData _data)
-    {
-        PointerEventData data = _data as PointerEventData;
-        ItemDisplay item = data.pointerEnter.GetComponentInParent<ItemDisplay>();
-        SelectSong(item.SongInfo);
-    }
-    public void OnRecvSong(ICD.stHeader _msg, string _info)
-    {
-        if (_msg.GetType() != typeof(CMD_SongFile))
-            return;
 
-        ICD.CMD_SongFile msg = (ICD.CMD_SongFile)_msg;
-        if(msg.head.cmd == ICD.ICDDefines.CMD_Download)
-        {
-            msg.song.FilePath = Application.persistentDataPath + "/";
-            File.WriteAllBytes(Application.persistentDataPath + "/" + msg.song.FileNameNoExt + ".mp3", msg.stream.ToArray());
-        }
-        byte[] buf = Utils.Serialize(msg.song);
-        File.WriteAllBytes(Application.persistentDataPath + "/" + msg.song.FileNameNoExt + ".bytes", buf);
-    }
-    public AudioClip LoadAudioClip(string filename)
-    {
-        string url = "file://" + filename;
-        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
-        {
-            www.SendWebRequest();
-            while (!www.isDone) { }
-            if (www.isNetworkError)
-                return null;
-
-            return DownloadHandlerAudioClip.GetContent(www);
-        }
+        State = SystemState.Standby;
+        pnRootUI.SetActive(false);
+        Player.ResetCube();
     }
     private void PlaySong()
     {
         State = SystemState.WaitJump;
-        float delay = CurrentSong.JumpDelay + Setting.MusicDelay;
-        if (delay < 0)
-            delay = 0;
+        float gapBars = 2f * 60f / CurrentSong.BPM;
+        float jumpDelay = gapBars * 3f + Setting.Inst().MusicDelay;
+        float playMusicDelay = gapBars * 4f - CurrentSong.StartTime;
+        float playOff = playMusicDelay > 0 ? 0 : playMusicDelay * -1;
 
-        Invoke("StartJump", delay);
-        audioSource.Play();
-        accTime = -delay;
+        StartCoroutine(CountDown());
+        StartCoroutine(PlayMusic(playOff, Mathf.Max(0, playMusicDelay)));
+        Invoke("StartJump", jumpDelay);
+        accTime = -jumpDelay;
         IndexNextTP = 0;
     }
     private void StartJump()
@@ -154,8 +102,36 @@ public class SystemManager : MonoBehaviour
         State = SystemState.Playing;
         Player.StartJump();
     }
+    IEnumerator PlayMusic(float off, float delay)
+    {
+        if(delay > 0)
+        {
+            off = 0;
+            yield return new WaitForSeconds(delay);
+        }
+
+        if(State != SystemState.UIMode)
+        {
+            audioSource.time = off;
+            audioSource.Play();
+        }
+    }
+    IEnumerator CountDown()
+    {
+        float waitTime = 2f * 60f / CurrentSong.BPM;
+        SpriteRenderer mesh = CountDownObject.GetComponent<SpriteRenderer>();
+        CountDownObject.SetActive(true);
+        mesh.sprite = Numbers[2];
+        yield return new WaitForSeconds(waitTime);
+        mesh.sprite = Numbers[1];
+        yield return new WaitForSeconds(waitTime);
+        mesh.sprite = Numbers[0];
+        yield return new WaitForSeconds(waitTime);
+        CountDownObject.SetActive(false);
+    }
     public void StopJump()
     {
+        State = SystemState.UIMode;
         tabPoints.Clear();
         audioSource.Stop();
         pnRootUI.SetActive(true);
@@ -163,24 +139,31 @@ public class SystemManager : MonoBehaviour
 
     private void UpdateCurve()
     {
-        Setting.TimePerBar = 120.0f / CurrentSong.BPM;
-        Curve.UpdateLinear(Setting.SpeedMoveX, 1);
-        Curve.UpdateCurve(new Vector2(Setting.TimePerBar * 0.5f, Setting.JumpHeight), new Vector2(0, 0));
-        Setting.JumpHeightHalf = Curve.GetCurveY(Setting.TimePerBar * 0.25f);
+        Setting.Inst().TimePerBar = 120.0f / CurrentSong.BPM;
+        Curve.UpdateLinear(Setting.Inst().SpeedMoveX, 1);
+        Curve.UpdateCurve(new Vector2(Setting.Inst().TimePerBar * 0.5f, Setting.Inst().JumpHeight), new Vector2(0, 0));
+        Setting.Inst().JumpHeightHalf = Curve.GetCurveY(Setting.Inst().TimePerBar * 0.25f);
     }
 
     private void CreateTapPointScripts()
     {
         tabPoints.Clear();
         float accTime = 0;
-        TabInfo[] times = ToDeltas(CurrentSong.Bars);
+        Bar[] bars = null;
+
+        if (Setting.Inst().PlayMode == 1) //Random Mode
+            bars = Utils.CreateRandomBars(CurrentSong.BarCount);
+        else
+            bars = CurrentSong.Bars;
+
+        TabInfo[] times = ToDeltas(bars);
         Vector2 current = new Vector2(0, 0);
         float dir = 1.0f;
         for (int i = 0; i < times.Length; ++i)
         {
             accTime += times[i].time;
             float t = times[i].time;
-            current.x += (dir * Setting.SpeedMoveX * t);
+            current.x += (dir * Setting.Inst().SpeedMoveX * t);
             current.y += Curve.GetCurveY(t);
             dir *= -1;
 
@@ -193,8 +176,8 @@ public class SystemManager : MonoBehaviour
     TabInfo[] ToDeltas(Bar[] bars)
     {
         int stepIndex = 0;
-        float stepDelta = Setting.TimePerBar * 0.25f;
-        float delayTime = Setting.TimePerBar;
+        float stepDelta = Setting.Inst().TimePerBar * 0.25f;
+        float delayTime = Setting.Inst().TimePerBar;
         List<TabInfo> times = new List<TabInfo>();
         for (int i = 0; i < bars.Length; ++i)
         {

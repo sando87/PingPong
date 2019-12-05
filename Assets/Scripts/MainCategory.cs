@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class MainCategory : MonoBehaviour
 {
-    private static GameObject PreviousView;
+    public static GameObject PreviousView;
     public GameObject SelectView;
 
     // Start is called before the first frame update
@@ -17,8 +17,6 @@ public class MainCategory : MonoBehaviour
         Vector2 newSize = GetComponent<RectTransform>().sizeDelta;
         newSize.x = width;
         GetComponent<RectTransform>().sizeDelta = newSize;
-
-        PreviousView = GameObject.Find("pnMusicList");
     }
 
     public void OnClickButton()

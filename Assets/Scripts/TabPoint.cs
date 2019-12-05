@@ -165,7 +165,6 @@ public class TabPoint : MonoBehaviour
         mf.mesh.triangles = indicies.ToArray();
         mf.mesh.uv = factors;
 
-        mMaterial.SetColor("_Color", Color.gray);
         //Color color = mr.material.color;
         //color.a = FadeOut;
         //mr.material.color = color;
@@ -174,7 +173,7 @@ public class TabPoint : MonoBehaviour
     }
     public void UpdateTP()
     {
-        Color color = Color.gray;
+        Color color = new Color(0.8f, 0.8f, 0.8f);
         color.a = FadeOut;
         mMaterial.SetColor("_Color", color);
         mMaterial.SetVector("_Rounds", new Vector4(RoundFirstIn, RoundFirstOut, RoundSecondIn, RoundSecondOut));

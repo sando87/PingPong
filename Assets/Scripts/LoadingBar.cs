@@ -5,29 +5,55 @@ using UnityEngine.UI;
 
 public class LoadingBar : MonoBehaviour
 {
-    static private LoadingBar mInst = null;
-    static public LoadingBar GetInst() { return mInst; }
-    private Slider mSlider;
+    public GameObject mSlider;
+    public GameObject mRotateAnim;
+    public Sprite[] mImages;
+    public int mIndexImage;
 
-    // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
-        mInst = this;
-        mSlider = GetComponentInChildren<Slider>();
-        gameObject.SetActive(false);
+        if(mIndexImage >= 0)
+            StartCoroutine(UpdateSprite());
     }
-    
-    public void Show()
+    public static LoadingBar Show(bool rotateMode = false)
     {
-        gameObject.SetActive(true);
+        GameObject parent = GameObject.Find("RootUI");
+        GameObject prefab = Resources.Load< GameObject>("Prefabs/pnLoading");
+        GameObject obj = Instantiate(prefab, new Vector2(0, 0), Quaternion.identity, parent.transform);
+        obj.transform.SetAsLastSibling();
+        LoadingBar scrpit = obj.GetComponent<LoadingBar>();
+        if (rotateMode)
+        {
+            scrpit.mSlider.SetActive(false);
+            scrpit.mRotateAnim.SetActive(true);
+            scrpit.mIndexImage = 0;
+        }
+        else
+        {
+            scrpit.mSlider.SetActive(true);
+            scrpit.mRotateAnim.SetActive(false);
+            scrpit.mIndexImage = -1;
+        }
+        return scrpit;
     }
     public void Hide()
     {
-        gameObject.SetActive(false);
+        StopCoroutine(UpdateSprite());
+        Destroy(gameObject);
     }
     public void SetProgress(float rate)
     {
-        float value = (mSlider.maxValue - mSlider.minValue) * rate;
-        mSlider.value = mSlider.minValue + value;
+        Slider slide = mSlider.GetComponent<Slider>();
+        float value = (slide.maxValue - slide.minValue) * rate;
+        slide.value = slide.minValue + value;
+    }
+    IEnumerator UpdateSprite()
+    {
+        while(mIndexImage >= 0)
+        {
+            mRotateAnim.GetComponent<Image>().sprite = mImages[mIndexImage];
+            mIndexImage = (mIndexImage + 1) % mImages.Length;
+            yield return new WaitForSeconds(0.1f);
+        }
     }
 }
